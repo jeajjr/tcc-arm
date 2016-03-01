@@ -68,7 +68,7 @@
 #define TIME_SCALE_1S 0b00001100
 
 // number of samples in a time frame (osciloscope screen)
-#define NUM_SAMPLES_FRAME 1000
+#define NUM_SAMPLES_FRAME 100
 
 
 /*********************************
@@ -87,6 +87,8 @@
  *********************************/
 
 unsigned long getTimePeriod(unsigned long current_time_scale);
+void sendSamplesFrame(unsigned char current_time_scale, unsigned char current_voltage_range, unsigned char *samples_array);
+
 
 #endif /* OSCILOSCOPIO_H_ */
 

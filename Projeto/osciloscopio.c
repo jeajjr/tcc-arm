@@ -31,4 +31,30 @@ unsigned long getTimePeriod(unsigned long current_time_scale)
 	case TIME_SCALE_1S:
 		return (unsigned long) (SysCtlClockGet() * 1);
 	}
+
+	return 0;
 }
+
+void sendSamplesFrame(unsigned char current_time_scale, unsigned char current_voltage_range, unsigned char *samples_array)
+{
+	int i;
+
+	//U S P [DATA | CHANNEL] [VOLTAGE_SCALE] [TIME_SCALE] [DATA_LENGTH_H] [DATA_LENGTH_L] [DATA...] O K
+	UARTCharPut(UART0_BASE, 'U');
+	UARTCharPut(UART0_BASE, 'S');
+	UARTCharPut(UART0_BASE, 'P');
+	UARTCharPut(UART0_BASE, DATA | CHANNEL_1);
+	UARTCharPut(UART0_BASE, current_voltage_range);
+	UARTCharPut(UART0_BASE, current_time_scale);
+	UARTCharPut(UART0_BASE, (NUM_SAMPLES_FRAME >> 8) & 0xFF);
+	UARTCharPut(UART0_BASE, NUM_SAMPLES_FRAME & 0xFF);
+
+	for (i = 0; i < NUM_SAMPLES_FRAME; i++)
+		UARTCharPut(UART0_BASE, samples_array[i]);
+
+	UARTCharPut(UART0_BASE, 'O');
+	UARTCharPut(UART0_BASE, 'K');
+}
+
+
+

@@ -14,6 +14,11 @@ void__error__(char *pcFilename, unsigned long ulLine)
 int LED = 0;
 unsigned char current_trigger_level = (unsigned char) ((TRIGGER_LEVEL_100 + TRIGGER_LEVEL_0) / 2);
 unsigned char current_time_scale = TIME_SCALE_1S;
+unsigned char current_voltage_range = 0;
+
+unsigned char current_number_of_samples = 0;
+unsigned char samples_array[NUM_SAMPLES_FRAME];
+
 unsigned char ctrl_sample = FALSE;
 /**
  * INTERRUPT HANDLERS
@@ -104,7 +109,7 @@ int main(void)
 	// Timer 0
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
 	TimerConfigure(TIMER0_BASE, TIMER_CFG_32_BIT_PER);
-	TimerLoadSet(TIMER0_BASE, TIMER_A, getTimePeriod(current_time_scale) - 1);
+	TimerLoadSet(TIMER0_BASE, TIMER_A, getTimePeriod(current_time_scale)/NUM_SAMPLES_FRAME - 1);
 	IntEnable(INT_TIMER0A);
 	TimerEnable(TIMER0_BASE, TIMER_A);
 
@@ -132,7 +137,11 @@ int main(void)
 			while(!ADCIntStatus(ADC0_BASE, 1, false));
 			ADCSequenceDataGet(ADC0_BASE, 1, ulADC0Value);
 			unsigned int leitura = (ulADC0Value[0] + ulADC0Value[1] + ulADC0Value[2] + ulADC0Value[3])/4;
-			UARTCharPut(UART0_BASE, (leitura>>4) & 0xFF);
+			//UARTCharPut(UART0_BASE, (leitura>>4) & 0xFF);
+			samples_array[current_number_of_samples++] = (leitura>>4) & 0xFF;
+
+			if (current_number_of_samples == NUM_SAMPLES_FRAME)
+				sendSamplesFrame(current_time_scale, current_voltage_range, samples_array);
 
 			ctrl_sample = FALSE;
 		}
