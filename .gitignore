@@ -30,3 +30,11 @@
 
 # Debug files
 *.dSYM/
+
+# others
+Projeto/.launches/*
+Projeto/Debug/*
+Projeto/Debug/makefile
+Projeto/Debug/subdir_rules.mk
+Projeto/Debug/makefile
+Projeto/Debug/subdir_rules.mk
