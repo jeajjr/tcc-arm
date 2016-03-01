@@ -16,7 +16,7 @@ unsigned char current_trigger_level = (unsigned char) ((TRIGGER_LEVEL_100 + TRIG
 unsigned char current_time_scale = TIME_SCALE_1S;
 unsigned char current_voltage_range = 0;
 
-unsigned char current_number_of_samples = 0;
+unsigned int current_number_of_samples = 0;
 unsigned char samples_array[NUM_SAMPLES_FRAME];
 
 unsigned char ctrl_sample = FALSE;
@@ -141,8 +141,10 @@ int main(void)
 			samples_array[current_number_of_samples++] = (leitura>>4) & 0xFF;
 
 			if (current_number_of_samples == NUM_SAMPLES_FRAME)
+			{
 				sendSamplesFrame(current_time_scale, current_voltage_range, samples_array);
-
+				current_number_of_samples = 0;
+			}
 			ctrl_sample = FALSE;
 		}
 
