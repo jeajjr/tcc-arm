@@ -5,8 +5,32 @@
  *      Author: jeajjr
  */
 
+#include "inc/hw_ints.h"
+#include "inc/hw_types.h"
+#include "inc/hw_memmap.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/gpio.h"
+#include "driverlib/uart.h"
+#include "driverlib/pin_map.h"
+#include "driverlib/interrupt.h"
+#include "math.h"
+#include "driverlib/debug.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/adc.h"
+#include "driverlib/timer.h"
+
 #ifndef OSCILOSCOPIO_H_
 #define OSCILOSCOPIO_H_
+
+/*********************************
+ *
+ * GENERAL CONSTANTS AND DEFINITIONS
+ *
+ *********************************/
+
+#define BOOL unsigned char
+#define TRUE 1
+#define FALSE 0
 
 /*********************************
  *
@@ -56,4 +80,15 @@
 #define CHANNEL_1 0x01
 //#define CHANNEL_2 0x02
 
+/*********************************
+ *
+ * METHODS PROTOTYPES
+ *
+ *********************************/
+
+unsigned long getTimePeriod(unsigned long current_time_scale);
+
 #endif /* OSCILOSCOPIO_H_ */
+
+
+

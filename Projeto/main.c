@@ -1,17 +1,3 @@
-#include "inc/hw_ints.h"
-#include "inc/hw_types.h"
-#include "inc/hw_memmap.h"
-#include "driverlib/sysctl.h"
-#include "driverlib/gpio.h"
-#include "driverlib/uart.h"
-#include "driverlib/pin_map.h"
-#include "driverlib/interrupt.h"
-#include "math.h"
-#include "driverlib/debug.h"
-#include "driverlib/sysctl.h"
-#include "driverlib/adc.h"
-#include "driverlib/timer.h"
-
 #include "osciloscopio.h"
 
 #define PI 3.141592
@@ -27,8 +13,8 @@ void__error__(char *pcFilename, unsigned long ulLine)
  */
 int LED = 0;
 unsigned char current_trigger_level = (unsigned char) ((TRIGGER_LEVEL_100 + TRIGGER_LEVEL_0) / 2);
-unsigned char current_time_scale = TIME_SCALE_1MS;
-
+unsigned char current_time_scale = TIME_SCALE_1S;
+unsigned char ctrl_sample = FALSE;
 /**
  * INTERRUPT HANDLERS
  */
@@ -54,6 +40,14 @@ void UART1IntHandler(void)
 	}
 }
 
+void Timer0AIntHandler(void)
+{
+	// Clear the timer interrupt
+	TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+
+	ctrl_sample = TRUE;
+}
+
 /**
  * MAIN METHOD
  */
@@ -66,6 +60,7 @@ int main(void)
 	// LED
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
 	GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3);
+	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3, 0);
 
 	// UART 0
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
@@ -106,10 +101,18 @@ int main(void)
 	ADCSequenceEnable(ADC0_BASE, 3);
 */
 
+	// Timer 0
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
+	TimerConfigure(TIMER0_BASE, TIMER_CFG_32_BIT_PER);
+	TimerLoadSet(TIMER0_BASE, TIMER_A, getTimePeriod(current_time_scale) - 1);
+	IntEnable(INT_TIMER0A);
+	TimerEnable(TIMER0_BASE, TIMER_A);
+
 	// interruptions
 	IntMasterEnable();
 	IntEnable(INT_UART0);
 	UARTIntEnable(UART0_BASE, UART_INT_RX | UART_INT_RT);
+	TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
 /*
 	IntEnable(INT_UART1);
 	UARTIntEnable(UART1_BASE, UART_INT_RX | UART_INT_RT);
@@ -118,19 +121,20 @@ int main(void)
 	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3, 1<<3);
 	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3, 1<<2);
 
-	int limLED = 10000;
+	int limLED = 500000;
 
 	while(1)
 	{
-		ADCIntClear(ADC0_BASE, 1);
-		ADCProcessorTrigger(ADC0_BASE, 1);
-		while(!ADCIntStatus(ADC0_BASE, 1, false));
-		ADCSequenceDataGet(ADC0_BASE, 1, ulADC0Value);
-		unsigned int leitura = (ulADC0Value[0] + ulADC0Value[1] + ulADC0Value[2] + ulADC0Value[3])/4;
-
+		if (ctrl_sample)
 		{
+			ADCIntClear(ADC0_BASE, 1);
+			ADCProcessorTrigger(ADC0_BASE, 1);
+			while(!ADCIntStatus(ADC0_BASE, 1, false));
+			ADCSequenceDataGet(ADC0_BASE, 1, ulADC0Value);
+			unsigned int leitura = (ulADC0Value[0] + ulADC0Value[1] + ulADC0Value[2] + ulADC0Value[3])/4;
 			UARTCharPut(UART0_BASE, (leitura>>4) & 0xFF);
-			sampleCount = 0;
+
+			ctrl_sample = FALSE;
 		}
 
 		// LED blinking logic
