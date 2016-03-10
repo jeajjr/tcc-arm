@@ -18,6 +18,9 @@
 #include "driverlib/sysctl.h"
 #include "driverlib/adc.h"
 #include "driverlib/timer.h"
+#include <string.h>
+#include <stdio.h>
+#include "utils/ustdlib.h"
 
 #ifndef OSCILOSCOPIO_H_
 #define OSCILOSCOPIO_H_
@@ -31,6 +34,7 @@
 #define BOOL unsigned char
 #define TRUE 1
 #define FALSE 0
+#define PRINTF
 
 /*********************************
  *
@@ -41,9 +45,12 @@
 
 // TRIGGER LEVEL
 #define SET_TRIGGER_LEVEL 0b00000000
-#define TRIGGER_LEVEL_OFF 0b00000000
-#define TRIGGER_LEVEL_0 0b00000001
-#define TRIGGER_LEVEL_100 0b00011111
+// number of samples before the current to use to detect trigger occurence
+#define TRIGGER_SAMPLES_OFFSET 2
+
+#define TRIGGER_LEVEL_0 0b00000000
+#define TRIGGER_LEVEL_100 0b00011110
+#define TRIGGER_LEVEL_OFF 0b00011111
 
 // VOLTAGE RANGE
 	/*
@@ -68,7 +75,7 @@
 #define TIME_SCALE_1S 0b00001100
 
 // number of samples in a time frame (osciloscope screen)
-#define NUM_SAMPLES_FRAME 100
+#define NUM_SAMPLES_FRAME 50
 
 
 /*********************************
@@ -87,8 +94,11 @@
  *********************************/
 
 unsigned long getTimePeriod(unsigned long current_time_scale);
-void sendSamplesFrame(unsigned char current_time_scale, unsigned char current_voltage_range, unsigned char *samples_array);
-
+void sendSamplesFrame(unsigned char current_time_scale, unsigned char current_voltage_range,
+		unsigned char *samples_array, unsigned int current_frame_start_index);
+unsigned char ADCRead();
+void UARTPrint(char *string);
+void UARTPrintln(char *string);
 
 #endif /* OSCILOSCOPIO_H_ */
 

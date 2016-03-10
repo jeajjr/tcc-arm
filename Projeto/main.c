@@ -11,15 +11,22 @@ void__error__(char *pcFilename, unsigned long ulLine)
 /**
  * GLOBAL VARIABLES
  */
-int LED = 0;
-unsigned char current_trigger_level = (unsigned char) ((TRIGGER_LEVEL_100 + TRIGGER_LEVEL_0) / 2);
+unsigned char current_trigger_level = 0x80;
 unsigned char current_time_scale = TIME_SCALE_1S;
 unsigned char current_voltage_range = 0;
 
-unsigned int current_number_of_samples = 0;
+unsigned int current_sample_index = 0;
+unsigned int current_frame_start_index = 0;
 unsigned char samples_array[NUM_SAMPLES_FRAME];
 
-unsigned char ctrl_sample = FALSE;
+unsigned char ctrl_do_sample = FALSE;
+unsigned char ctrl_trigger_detected = FALSE;
+
+int LED2 = 0;
+int limLED2 = 5;
+int LED3 = 0;
+int limLED3 = 50;
+
 /**
  * INTERRUPT HANDLERS
  */
@@ -50,7 +57,13 @@ void Timer0AIntHandler(void)
 	// Clear the timer interrupt
 	TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
 
-	ctrl_sample = TRUE;
+	ctrl_do_sample = TRUE;
+
+	// LED3 blinking logic
+	if (LED3)
+		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); LED3 = FALSE; }
+	else
+		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0); LED3 = TRUE; }
 }
 
 /**
@@ -58,7 +71,6 @@ void Timer0AIntHandler(void)
  */
 int main(void)
 {
-	unsigned long ulADC0Value[4];
 	// clock
 	SysCtlClockSet(SYSCTL_SYSDIV_4|SYSCTL_USE_PLL|SYSCTL_XTAL_16MHZ|SYSCTL_OSC_MAIN);
 
@@ -122,35 +134,71 @@ int main(void)
 	IntEnable(INT_UART1);
 	UARTIntEnable(UART1_BASE, UART_INT_RX | UART_INT_RT);
 */
+	char blah[50];
+	int i;
+	for (i=0; i<NUM_SAMPLES_FRAME; i++)
+		samples_array[i] = 0;
 
-	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3, 1<<3);
-	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3, 1<<2);
-
-	int limLED = 500000;
-
+	UARTPrintln("starting ...");
 	while(1)
 	{
-		if (ctrl_sample)
+#define ENABLE
+#ifdef ENABLE
+		if (ctrl_do_sample)
 		{
-			ADCIntClear(ADC0_BASE, 1);
-			ADCProcessorTrigger(ADC0_BASE, 1);
-			while(!ADCIntStatus(ADC0_BASE, 1, false));
-			ADCSequenceDataGet(ADC0_BASE, 1, ulADC0Value);
-			unsigned int leitura = (ulADC0Value[0] + ulADC0Value[1] + ulADC0Value[2] + ulADC0Value[3])/4;
-			//UARTCharPut(UART0_BASE, (leitura>>4) & 0xFF);
-			samples_array[current_number_of_samples++] = (leitura>>4) & 0xFF;
+			ctrl_do_sample = FALSE;
 
-			if (current_number_of_samples == NUM_SAMPLES_FRAME)
+			// continuous circuilar acquisition
+			samples_array[current_sample_index] = ADCRead();
+
+			if (samples_array[current_sample_index] > current_trigger_level)
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, GPIO_PIN_1);
+			else
+				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);
+
+			snprintf (blah, 50, "current_frame_start_index: %d", current_frame_start_index); UARTPrintln(blah);
+			snprintf (blah, 50, "samples_array[%d]: %d", current_sample_index, samples_array[current_sample_index]); UARTPrintln(blah);
+
+			if (!ctrl_trigger_detected)
 			{
-				sendSamplesFrame(current_time_scale, current_voltage_range, samples_array);
-				current_number_of_samples = 0;
+				//trigger detection
+				if (samples_array[current_sample_index] > current_trigger_level
+						/*
+					&& samples_array[current_sample_index >= TRIGGER_SAMPLES_OFFSET ?
+						current_sample_index - TRIGGER_SAMPLES_OFFSET :
+						NUM_SAMPLES_FRAME - TRIGGER_SAMPLES_OFFSET + current_sample_index] < current_trigger_level
+						*/
+				)
+				{
+					ctrl_trigger_detected = TRUE;
+					UARTPrintln("trigger on");
+					current_frame_start_index = current_sample_index;
+				}
 			}
-			ctrl_sample = FALSE;
-		}
+			else
+			{
+				// detect end of current frame
+				if ((current_frame_start_index == 0 && current_sample_index == NUM_SAMPLES_FRAME - 1)
+					|| (current_sample_index == current_frame_start_index - 1))
+				{
+					ctrl_trigger_detected = FALSE;
+					UARTPrintln("trigger off");
+					sendSamplesFrame(current_time_scale, current_voltage_range, samples_array, current_frame_start_index);
+				}
+			}
 
-		// LED blinking logic
-		if (LED < limLED/2) GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 1<<3);
+			current_sample_index++;
+			if (current_sample_index == NUM_SAMPLES_FRAME)
+				current_sample_index = 0;
+		}
+#endif
+
+		//UARTCharPut(UART0_BASE, ADCRead());
+/*
+		// LED3 blinking logic
+		if (LED3 < limLED3/2) GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3);
 		else GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0);
-		if (LED++ == limLED) LED = 0;
+		if (LED3++ == limLED3) LED3 = 0;
+		*/
 	}
 }
