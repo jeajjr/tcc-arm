@@ -75,7 +75,7 @@
 #define TIME_SCALE_1S 0b00001100
 
 // number of samples in a time frame (osciloscope screen)
-#define NUM_SAMPLES_FRAME 50
+#define NUM_SAMPLES_FRAME 1000
 
 
 /*********************************

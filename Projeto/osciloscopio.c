@@ -5,31 +5,31 @@ unsigned long getTimePeriod(unsigned long current_time_scale)
 	switch(current_time_scale)
 	{
 	case TIME_SCALE_10US:
-		return (unsigned long) (SysCtlClockGet() * 0.00001);
+		return (unsigned long) ((SysCtlClockGet() * 0.00001) / NUM_SAMPLES_FRAME);
 	case TIME_SCALE_50US:
-		return (unsigned long) (SysCtlClockGet() * 0.00005);
+		return (unsigned long) ((SysCtlClockGet() * 0.00005) / NUM_SAMPLES_FRAME);
 	case TIME_SCALE_100US:
-		return (unsigned long) (SysCtlClockGet() * 0.0001);
+		return (unsigned long) ((SysCtlClockGet() * 0.0001) / NUM_SAMPLES_FRAME);
 	case TIME_SCALE_200US:
-		return (unsigned long) (SysCtlClockGet() * 0.0002);
+		return (unsigned long) ((SysCtlClockGet() * 0.0002) / NUM_SAMPLES_FRAME);
 	case TIME_SCALE_500US:
-		return (unsigned long) (SysCtlClockGet() * 0.0005);
+		return (unsigned long) ((SysCtlClockGet() * 0.0005) / NUM_SAMPLES_FRAME);
 	case TIME_SCALE_1MS:
-		return (unsigned long) (SysCtlClockGet() * 0.001);
+		return (unsigned long) ((SysCtlClockGet() * 0.001) / NUM_SAMPLES_FRAME);
 	case TIME_SCALE_5MS:
-		return (unsigned long) (SysCtlClockGet() * 0.005);
+		return (unsigned long) ((SysCtlClockGet() * 0.005) / NUM_SAMPLES_FRAME);
 	case TIME_SCALE_10MS:
-		return (unsigned long) (SysCtlClockGet() * 0.01);
+		return (unsigned long) ((SysCtlClockGet() * 0.01) / NUM_SAMPLES_FRAME);
 	case TIME_SCALE_50MS:
-		return (unsigned long) (SysCtlClockGet() * 0.05);
+		return (unsigned long) ((SysCtlClockGet() * 0.05) / NUM_SAMPLES_FRAME);
 	case TIME_SCALE_100MS:
-		return (unsigned long) (SysCtlClockGet() * 0.1);
+		return (unsigned long) ((SysCtlClockGet() * 0.1) / NUM_SAMPLES_FRAME);
 	case TIME_SCALE_200MS:
-		return (unsigned long) (SysCtlClockGet() * 0.2);
+		return (unsigned long) ((SysCtlClockGet() * 0.2) / NUM_SAMPLES_FRAME);
 	case TIME_SCALE_500MS:
-		return (unsigned long) (SysCtlClockGet() * 0.5);
+		return (unsigned long) ((SysCtlClockGet() * 0.5) / NUM_SAMPLES_FRAME);
 	case TIME_SCALE_1S:
-		return (unsigned long) (SysCtlClockGet() * 1);
+		return (unsigned long) ((SysCtlClockGet() * 1) / NUM_SAMPLES_FRAME);
 	}
 
 	return 0;

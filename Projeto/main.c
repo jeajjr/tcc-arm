@@ -12,7 +12,7 @@ void__error__(char *pcFilename, unsigned long ulLine)
  * GLOBAL VARIABLES
  */
 unsigned char current_trigger_level = 0x80;
-unsigned char current_time_scale = TIME_SCALE_1S;
+unsigned char current_time_scale = TIME_SCALE_10MS;
 unsigned char current_voltage_range = 0;
 
 unsigned int current_sample_index = 0;
@@ -26,6 +26,7 @@ int LED2 = 0;
 int limLED2 = 5;
 int LED3 = 0;
 int limLED3 = 50;
+int PWM = 0;
 
 /**
  * INTERRUPT HANDLERS
@@ -64,6 +65,16 @@ void Timer0AIntHandler(void)
 		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); LED3 = FALSE; }
 	else
 		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0); LED3 = TRUE; }
+
+}
+
+void Timer1AIntHandler(void)
+{
+	// Clear the timer interrupt
+	TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
+
+	if (PWM) { GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_4, GPIO_PIN_4); PWM = FALSE; }
+	else { GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_4, 0); PWM = TRUE; }
 }
 
 /**
@@ -76,8 +87,8 @@ int main(void)
 
 	// LED
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
-	GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3);
-	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3, 0);
+	GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4);
+	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4, 0);
 
 	// UART 0
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
@@ -121,15 +132,24 @@ int main(void)
 	// Timer 0
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
 	TimerConfigure(TIMER0_BASE, TIMER_CFG_32_BIT_PER);
-	TimerLoadSet(TIMER0_BASE, TIMER_A, getTimePeriod(current_time_scale)/NUM_SAMPLES_FRAME - 1);
+	TimerLoadSet(TIMER0_BASE, TIMER_A, getTimePeriod(current_time_scale));
 	IntEnable(INT_TIMER0A);
 	TimerEnable(TIMER0_BASE, TIMER_A);
+
+	// Timer 1
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
+	TimerConfigure(TIMER1_BASE, TIMER_CFG_32_BIT_PER);
+	TimerLoadSet(TIMER1_BASE, TIMER_A, (SysCtlClockGet() * 0.001)); //0.00001 = período de 20us
+																	//0.001 = período de 2ms
+	IntEnable(INT_TIMER1A);
+	TimerEnable(TIMER1_BASE, TIMER_A);
 
 	// interruptions
 	IntMasterEnable();
 	IntEnable(INT_UART0);
 	UARTIntEnable(UART0_BASE, UART_INT_RX | UART_INT_RT);
 	TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+	TimerIntEnable(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
 /*
 	IntEnable(INT_UART1);
 	UARTIntEnable(UART1_BASE, UART_INT_RX | UART_INT_RT);
@@ -139,7 +159,20 @@ int main(void)
 	for (i=0; i<NUM_SAMPLES_FRAME; i++)
 		samples_array[i] = 0;
 
-	UARTPrintln("starting ...");
+/*
+ *
+ 	 UARTPrintln("starting ...");
+	snprintf (blah, 50, "%d", (int) getTimePeriod(current_time_scale)); UARTPrintln(blah);
+
+	TimerEnable(TIMER0_BASE, TIMER_A);
+	ADCRead();
+	TimerDisable(TIMER0_BASE, TIMER_A);
+	snprintf (blah, 50, "%d", (int) TimerValueGet(TIMER1_BASE, TIMER_A)); UARTPrintln(blah);
+
+	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_4, GPIO_PIN_4);
+	while(1);
+
+ */
 	while(1)
 	{
 #define ENABLE
@@ -156,8 +189,8 @@ int main(void)
 			else
 				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);
 
-			snprintf (blah, 50, "current_frame_start_index: %d", current_frame_start_index); UARTPrintln(blah);
-			snprintf (blah, 50, "samples_array[%d]: %d", current_sample_index, samples_array[current_sample_index]); UARTPrintln(blah);
+			//snprintf (blah, 50, "current_frame_start_index: %d", current_frame_start_index); UARTPrintln(blah);
+			//snprintf (blah, 50, "samples_array[%d]: %d", current_sample_index, samples_array[current_sample_index]); UARTPrintln(blah);
 
 			if (!ctrl_trigger_detected)
 			{
@@ -171,7 +204,7 @@ int main(void)
 				)
 				{
 					ctrl_trigger_detected = TRUE;
-					UARTPrintln("trigger on");
+					//UARTPrintln("trigger on");
 					current_frame_start_index = current_sample_index;
 				}
 			}
@@ -182,7 +215,7 @@ int main(void)
 					|| (current_sample_index == current_frame_start_index - 1))
 				{
 					ctrl_trigger_detected = FALSE;
-					UARTPrintln("trigger off");
+					//UARTPrintln("trigger off");
 					sendSamplesFrame(current_time_scale, current_voltage_range, samples_array, current_frame_start_index);
 				}
 			}
