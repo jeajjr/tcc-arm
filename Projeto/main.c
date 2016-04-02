@@ -19,8 +19,11 @@ unsigned int current_sample_index = 0;
 unsigned int current_frame_start_index = 0;
 unsigned char samples_array[NUM_SAMPLES_FRAME];
 
-unsigned char ctrl_do_sample = FALSE;
-unsigned char ctrl_trigger_detected = FALSE;
+BOOL ctrl_do_sample = FALSE;
+BOOL ctrl_trigger_detected = FALSE;
+
+BOOL crtl_hold_off = FALSE;
+unsigned int hold_off_value = HOLD_OFF_START_VALUE;
 
 int LED2 = 0;
 int limLED2 = 5;
@@ -139,7 +142,7 @@ int main(void)
 	// Timer 1
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
 	TimerConfigure(TIMER1_BASE, TIMER_CFG_32_BIT_PER);
-	TimerLoadSet(TIMER1_BASE, TIMER_A, (SysCtlClockGet() * 0.001)); //0.00001 = período de 20us
+	TimerLoadSet(TIMER1_BASE, TIMER_A, (SysCtlClockGet() * 0.0011)); //0.00001 = período de 20us
 																	//0.001 = período de 2ms
 	IntEnable(INT_TIMER1A);
 	TimerEnable(TIMER1_BASE, TIMER_A);
@@ -181,48 +184,52 @@ int main(void)
 		{
 			ctrl_do_sample = FALSE;
 
-			// continuous circuilar acquisition
-			samples_array[current_sample_index] = ADCRead();
+			if (hold_off_value > 0)
+				hold_off_value--;
+			else //hold_off_value == 0
 
-			if (samples_array[current_sample_index] > current_trigger_level)
-				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, GPIO_PIN_1);
-			else
-				GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);
-
-			//snprintf (blah, 50, "current_frame_start_index: %d", current_frame_start_index); UARTPrintln(blah);
-			//snprintf (blah, 50, "samples_array[%d]: %d", current_sample_index, samples_array[current_sample_index]); UARTPrintln(blah);
-
-			if (!ctrl_trigger_detected)
 			{
-				//trigger detection
-				if (samples_array[current_sample_index] > current_trigger_level
-						/*
-					&& samples_array[current_sample_index >= TRIGGER_SAMPLES_OFFSET ?
-						current_sample_index - TRIGGER_SAMPLES_OFFSET :
-						NUM_SAMPLES_FRAME - TRIGGER_SAMPLES_OFFSET + current_sample_index] < current_trigger_level
-						*/
-				)
-				{
-					ctrl_trigger_detected = TRUE;
-					//UARTPrintln("trigger on");
-					current_frame_start_index = current_sample_index;
-				}
-			}
-			else
-			{
-				// detect end of current frame
-				if ((current_frame_start_index == 0 && current_sample_index == NUM_SAMPLES_FRAME - 1)
-					|| (current_sample_index == current_frame_start_index - 1))
-				{
-					ctrl_trigger_detected = FALSE;
-					//UARTPrintln("trigger off");
-					sendSamplesFrame(current_time_scale, current_voltage_range, samples_array, current_frame_start_index);
-				}
-			}
+				// continuous circuilar acquisition
+				samples_array[current_sample_index] = ADCRead();
 
-			current_sample_index++;
-			if (current_sample_index == NUM_SAMPLES_FRAME)
-				current_sample_index = 0;
+				if (samples_array[current_sample_index] > current_trigger_level)
+					GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, GPIO_PIN_1);
+				else
+					GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);
+
+				if (!ctrl_trigger_detected)
+				{
+					//trigger detection
+					if (samples_array[current_sample_index] > current_trigger_level
+							/*
+						&& samples_array[current_sample_index >= TRIGGER_SAMPLES_OFFSET ?
+							current_sample_index - TRIGGER_SAMPLES_OFFSET :
+							NUM_SAMPLES_FRAME - TRIGGER_SAMPLES_OFFSET + current_sample_index] < current_trigger_level
+							*/
+					)
+					{
+						ctrl_trigger_detected = TRUE;
+						//UARTPrintln("trigger on");
+						current_frame_start_index = current_sample_index;
+					}
+				}
+				else
+				{
+					// detect end of current frame
+					if ((current_frame_start_index == 0 && current_sample_index == NUM_SAMPLES_FRAME - 1)
+						|| (current_sample_index == current_frame_start_index - 1))
+					{
+						ctrl_trigger_detected = FALSE;
+						//UARTPrintln("trigger off");
+						sendSamplesFrame(current_time_scale, current_voltage_range, samples_array, current_frame_start_index);
+						hold_off_value = HOLD_OFF_START_VALUE;
+					}
+				}
+
+				current_sample_index++;
+				if (current_sample_index == NUM_SAMPLES_FRAME)
+					current_sample_index = 0;
+			}
 		}
 #endif
 

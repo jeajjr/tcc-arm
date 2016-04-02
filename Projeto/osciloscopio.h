@@ -34,7 +34,7 @@
 #define BOOL unsigned char
 #define TRUE 1
 #define FALSE 0
-#define PRINTF
+//#define PRINTF
 
 /*********************************
  *
@@ -75,8 +75,8 @@
 #define TIME_SCALE_1S 0b00001100
 
 // number of samples in a time frame (osciloscope screen)
-#define NUM_SAMPLES_FRAME 1000
-
+#define NUM_SAMPLES_FRAME 100
+#define HOLD_OFF_START_VALUE NUM_SAMPLES_FRAME * 10
 
 /*********************************
  *

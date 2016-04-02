@@ -56,6 +56,9 @@ void sendSamplesFrame(unsigned char current_time_scale, unsigned char current_vo
 	for (i = 0; i < current_frame_start_index; i++)
 			UARTCharPut(UART0_BASE, samples_array[i]);
 
+	static unsigned char a = 0;
+		UARTCharPut(UART0_BASE, a++);
+
 	UARTCharPut(UART0_BASE, 'O');
 	UARTCharPut(UART0_BASE, 'K');
 #else
@@ -72,6 +75,7 @@ void sendSamplesFrame(unsigned char current_time_scale, unsigned char current_vo
 		snprintf (buff, 100, "%d ", samples_array[i]);
 		UARTPrint(buff);
 	}
+
 	UARTPrintln("");
 #endif
 }
