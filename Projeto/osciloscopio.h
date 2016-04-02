@@ -45,8 +45,12 @@
 
 // TRIGGER LEVEL
 #define SET_TRIGGER_LEVEL 0b00000000
-// number of samples before the current to use to detect trigger occurence
-#define TRIGGER_SAMPLES_OFFSET 2
+/* trigger offset:
+	when 0, triggered sample will be at the start of the sent frame
+	when NUM_SAMPLES_FRAME/2, triggered sample will be at the middle of the sent frame
+	when NUM_SAMPLES_FRAME, triggered sample will be at the end of the sent frame
+*/
+#define TRIGGER_SAMPLES_OFFSET 50
 
 #define TRIGGER_LEVEL_0 0b00000000
 #define TRIGGER_LEVEL_100 0b00011110
@@ -75,8 +79,8 @@
 #define TIME_SCALE_1S 0b00001100
 
 // number of samples in a time frame (osciloscope screen)
-#define NUM_SAMPLES_FRAME 100
-#define HOLD_OFF_START_VALUE NUM_SAMPLES_FRAME * 10
+#define NUM_SAMPLES_FRAME 1000
+#define HOLD_OFF_START_VALUE NUM_SAMPLES_FRAME * 30
 
 /*********************************
  *
@@ -97,6 +101,7 @@ unsigned long getTimePeriod(unsigned long current_time_scale);
 void sendSamplesFrame(unsigned char current_time_scale, unsigned char current_voltage_range,
 		unsigned char *samples_array, unsigned int current_frame_start_index);
 unsigned char ADCRead();
+unsigned int getFrameStart(unsigned int current_index);
 void UARTPrint(char *string);
 void UARTPrintln(char *string);
 

@@ -75,9 +75,14 @@ void Timer1AIntHandler(void)
 {
 	// Clear the timer interrupt
 	TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
+	PWM++;
+	if (PWM == 15 || PWM == 12)
+		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_4, GPIO_PIN_4);  }
+	else
+		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_4, 0);  }
 
-	if (PWM) { GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_4, GPIO_PIN_4); PWM = FALSE; }
-	else { GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_4, 0); PWM = TRUE; }
+	if (PWM == 17)
+		PWM = 0;
 }
 
 /**
@@ -159,8 +164,9 @@ int main(void)
 */
 	char blah[50];
 	int i;
-	for (i=0; i<NUM_SAMPLES_FRAME; i++)
+	for (i=0; i<NUM_SAMPLES_FRAME; i++) {
 		samples_array[i] = 0;
+	}
 
 /*
  *
@@ -184,33 +190,22 @@ int main(void)
 		{
 			ctrl_do_sample = FALSE;
 
+			// continuous circuilar acquisition
+			samples_array[current_sample_index] = ADCRead();
+
 			if (hold_off_value > 0)
 				hold_off_value--;
 			else //hold_off_value == 0
-
 			{
-				// continuous circuilar acquisition
-				samples_array[current_sample_index] = ADCRead();
-
-				if (samples_array[current_sample_index] > current_trigger_level)
-					GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, GPIO_PIN_1);
-				else
-					GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);
-
 				if (!ctrl_trigger_detected)
 				{
 					//trigger detection
-					if (samples_array[current_sample_index] > current_trigger_level
-							/*
-						&& samples_array[current_sample_index >= TRIGGER_SAMPLES_OFFSET ?
-							current_sample_index - TRIGGER_SAMPLES_OFFSET :
-							NUM_SAMPLES_FRAME - TRIGGER_SAMPLES_OFFSET + current_sample_index] < current_trigger_level
-							*/
-					)
+					if (samples_array[current_sample_index] > current_trigger_level)
 					{
 						ctrl_trigger_detected = TRUE;
 						//UARTPrintln("trigger on");
-						current_frame_start_index = current_sample_index;
+						current_frame_start_index = getFrameStart(current_sample_index);
+						current_frame_start_index = current_frame_start_index;
 					}
 				}
 				else
@@ -226,10 +221,11 @@ int main(void)
 					}
 				}
 
-				current_sample_index++;
-				if (current_sample_index == NUM_SAMPLES_FRAME)
-					current_sample_index = 0;
+
 			}
+			current_sample_index++;
+			if (current_sample_index == NUM_SAMPLES_FRAME)
+				current_sample_index = 0;
 		}
 #endif
 

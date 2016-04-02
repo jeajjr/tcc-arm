@@ -56,9 +56,6 @@ void sendSamplesFrame(unsigned char current_time_scale, unsigned char current_vo
 	for (i = 0; i < current_frame_start_index; i++)
 			UARTCharPut(UART0_BASE, samples_array[i]);
 
-	static unsigned char a = 0;
-		UARTCharPut(UART0_BASE, a++);
-
 	UARTCharPut(UART0_BASE, 'O');
 	UARTCharPut(UART0_BASE, 'K');
 #else
@@ -89,12 +86,20 @@ unsigned char ADCRead() {
 	unsigned int leitura = (ulADC0Value[0] + ulADC0Value[1] + ulADC0Value[2] + ulADC0Value[3])/4;
 	return ((leitura>>4) & 0xFF);
 }
+unsigned int getFrameStart(unsigned int current_index) {
+	int a = current_index - TRIGGER_SAMPLES_OFFSET;
+	if (a < 0)
+		return NUM_SAMPLES_FRAME + current_index - TRIGGER_SAMPLES_OFFSET;
+	else
+		return current_index - TRIGGER_SAMPLES_OFFSET;
+}
 
 void UARTPrint(char *string) {
 	int i=0;
 	while (string[i] != '\0')
 		UARTCharPut(UART0_BASE, string[i++]);
 }
+
 void UARTPrintln(char *string) {
 	int i=0;
 	while (string[i] != '\0')
