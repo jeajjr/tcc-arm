@@ -1,41 +1,50 @@
 #include "osciloscopio.h"
 
-unsigned long getTimePeriod(unsigned long current_time_scale)
+void initializeConfiguration (CONFIG *configs) {
+	configs->current_trigger_level = 0x80;
+	configs->trigger_sample_offset = INITIAL_TRIGGER_SAMPLES_OFFSET;
+	configs->current_time_scale = TIME_SCALE_10MS;
+	configs->current_voltage_range = 0;
+	configs->hold_off_value = HOLD_OFF_START_VALUE;
+	configs->num_samples_frame = 1000;
+}
+
+unsigned long getTimePeriod(CONFIG *configs)
 {
-	switch(current_time_scale)
+	switch(configs->current_time_scale)
 	{
 	case TIME_SCALE_10US:
-		return (unsigned long) ((SysCtlClockGet() * 0.00001) / NUM_SAMPLES_FRAME);
+		return (unsigned long) ((SysCtlClockGet() * 0.00001) / configs->num_samples_frame);
 	case TIME_SCALE_50US:
-		return (unsigned long) ((SysCtlClockGet() * 0.00005) / NUM_SAMPLES_FRAME);
+		return (unsigned long) ((SysCtlClockGet() * 0.00005) / configs->num_samples_frame);
 	case TIME_SCALE_100US:
-		return (unsigned long) ((SysCtlClockGet() * 0.0001) / NUM_SAMPLES_FRAME);
+		return (unsigned long) ((SysCtlClockGet() * 0.0001) / configs->num_samples_frame);
 	case TIME_SCALE_200US:
-		return (unsigned long) ((SysCtlClockGet() * 0.0002) / NUM_SAMPLES_FRAME);
+		return (unsigned long) ((SysCtlClockGet() * 0.0002) / configs->num_samples_frame);
 	case TIME_SCALE_500US:
-		return (unsigned long) ((SysCtlClockGet() * 0.0005) / NUM_SAMPLES_FRAME);
+		return (unsigned long) ((SysCtlClockGet() * 0.0005) / configs->num_samples_frame);
 	case TIME_SCALE_1MS:
-		return (unsigned long) ((SysCtlClockGet() * 0.001) / NUM_SAMPLES_FRAME);
+		return (unsigned long) ((SysCtlClockGet() * 0.001) / configs->num_samples_frame);
 	case TIME_SCALE_5MS:
-		return (unsigned long) ((SysCtlClockGet() * 0.005) / NUM_SAMPLES_FRAME);
+		return (unsigned long) ((SysCtlClockGet() * 0.005) / configs->num_samples_frame);
 	case TIME_SCALE_10MS:
-		return (unsigned long) ((SysCtlClockGet() * 0.01) / NUM_SAMPLES_FRAME);
+		return (unsigned long) ((SysCtlClockGet() * 0.01) / configs->num_samples_frame);
 	case TIME_SCALE_50MS:
-		return (unsigned long) ((SysCtlClockGet() * 0.05) / NUM_SAMPLES_FRAME);
+		return (unsigned long) ((SysCtlClockGet() * 0.05) / configs->num_samples_frame);
 	case TIME_SCALE_100MS:
-		return (unsigned long) ((SysCtlClockGet() * 0.1) / NUM_SAMPLES_FRAME);
+		return (unsigned long) ((SysCtlClockGet() * 0.1) / configs->num_samples_frame);
 	case TIME_SCALE_200MS:
-		return (unsigned long) ((SysCtlClockGet() * 0.2) / NUM_SAMPLES_FRAME);
+		return (unsigned long) ((SysCtlClockGet() * 0.2) / configs->num_samples_frame);
 	case TIME_SCALE_500MS:
-		return (unsigned long) ((SysCtlClockGet() * 0.5) / NUM_SAMPLES_FRAME);
+		return (unsigned long) ((SysCtlClockGet() * 0.5) / configs->num_samples_frame);
 	case TIME_SCALE_1S:
-		return (unsigned long) ((SysCtlClockGet() * 1) / NUM_SAMPLES_FRAME);
+		return (unsigned long) ((SysCtlClockGet() * 1) / configs->num_samples_frame);
 	}
 
 	return 0;
 }
 
-void sendSamplesFrame(unsigned char current_time_scale, unsigned char current_voltage_range, unsigned char *samples_array, unsigned int current_frame_start_index)
+void sendSamplesFrame(CONFIG *configs, unsigned char *samples_array, unsigned int current_frame_start_index)
 {
 	unsigned int i;
 
@@ -46,12 +55,12 @@ void sendSamplesFrame(unsigned char current_time_scale, unsigned char current_vo
 	UARTCharPut(UART0_BASE, 'S');
 	UARTCharPut(UART0_BASE, 'P');
 	UARTCharPut(UART0_BASE, DATA | CHANNEL_1);
-	UARTCharPut(UART0_BASE, current_voltage_range);
-	UARTCharPut(UART0_BASE, current_time_scale);
-	UARTCharPut(UART0_BASE, (NUM_SAMPLES_FRAME >> 8) & 0xFF);
-	UARTCharPut(UART0_BASE, NUM_SAMPLES_FRAME & 0xFF);
+	UARTCharPut(UART0_BASE, configs->current_voltage_range);
+	UARTCharPut(UART0_BASE, configs->current_time_scale);
+	UARTCharPut(UART0_BASE, (configs->num_samples_frame >> 8) & 0xFF);
+	UARTCharPut(UART0_BASE, configs->num_samples_frame & 0xFF);
 
-	for (i = current_frame_start_index; i < NUM_SAMPLES_FRAME; i++)
+	for (i = current_frame_start_index; i < configs->num_samples_frame; i++)
 			UARTCharPut(UART0_BASE, samples_array[i]);
 	for (i = 0; i < current_frame_start_index; i++)
 			UARTCharPut(UART0_BASE, samples_array[i]);
@@ -61,9 +70,9 @@ void sendSamplesFrame(unsigned char current_time_scale, unsigned char current_vo
 #else
 	UARTPrintln("sample");
 	char buff[100];
-	snprintf (buff, 100, "%d %d %d %d ", DATA | CHANNEL_1, current_voltage_range, current_time_scale, NUM_SAMPLES_FRAME);
+	snprintf (buff, 100, "%d %d %d %d ", DATA | CHANNEL_1, configs->current_voltage_range, configs->current_time_scale, NUM_SAMPLES_FRAME);
 	UARTPrint(buff);
-	for (i = current_frame_start_index; i < NUM_SAMPLES_FRAME; i++) {
+	for (i = current_frame_start_index; i < configs->num_samples_frame; i++) {
 		snprintf (buff, 100, "%d ", samples_array[i]);
 		UARTPrint(buff);
 	}
@@ -86,12 +95,12 @@ unsigned char ADCRead() {
 	unsigned int leitura = (ulADC0Value[0] + ulADC0Value[1] + ulADC0Value[2] + ulADC0Value[3])/4;
 	return ((leitura>>4) & 0xFF);
 }
-unsigned int getFrameStart(unsigned int current_index) {
-	int a = current_index - TRIGGER_SAMPLES_OFFSET;
+unsigned int getFrameStart(CONFIG * configs, unsigned int current_index) {
+	int a = current_index - configs->trigger_sample_offset;
 	if (a < 0)
-		return NUM_SAMPLES_FRAME + current_index - TRIGGER_SAMPLES_OFFSET;
+		return configs->num_samples_frame + current_index - configs->trigger_sample_offset;
 	else
-		return current_index - TRIGGER_SAMPLES_OFFSET;
+		return current_index - configs->trigger_sample_offset;
 }
 
 void UARTPrint(char *string) {

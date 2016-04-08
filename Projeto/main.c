@@ -11,19 +11,15 @@ void__error__(char *pcFilename, unsigned long ulLine)
 /**
  * GLOBAL VARIABLES
  */
-unsigned char current_trigger_level = 0x80;
-unsigned char current_time_scale = TIME_SCALE_10MS;
-unsigned char current_voltage_range = 0;
+CONFIG configs;
 
+BOOL ctrl_do_sample;
+BOOL ctrl_trigger_detected;
+BOOL crtl_hold_off;
+
+unsigned char samples_array[MAX_SAMPLES_FRAME];
 unsigned int current_sample_index = 0;
 unsigned int current_frame_start_index = 0;
-unsigned char samples_array[NUM_SAMPLES_FRAME];
-
-BOOL ctrl_do_sample = FALSE;
-BOOL ctrl_trigger_detected = FALSE;
-
-BOOL crtl_hold_off = FALSE;
-unsigned int hold_off_value = HOLD_OFF_START_VALUE;
 
 int LED2 = 0;
 int limLED2 = 5;
@@ -42,7 +38,15 @@ void UART0IntHandler(void)
 	while(UARTCharsAvail(UART0_BASE)) //loop while there are chars
 	{
 		char a = UARTCharGetNonBlocking(UART0_BASE);
+		UARTCharPut(UART0_BASE, a);
+
+		if (LED2)
+			{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2); LED2 = FALSE; }
+		else
+			{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0); LED2 = TRUE; }
 	}
+
+
 }
 
 void UART1IntHandler(void)
@@ -90,6 +94,8 @@ void Timer1AIntHandler(void)
  */
 int main(void)
 {
+	initializeConfiguration(&configs);
+
 	// clock
 	SysCtlClockSet(SYSCTL_SYSDIV_4|SYSCTL_USE_PLL|SYSCTL_XTAL_16MHZ|SYSCTL_OSC_MAIN);
 
@@ -140,7 +146,7 @@ int main(void)
 	// Timer 0
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
 	TimerConfigure(TIMER0_BASE, TIMER_CFG_32_BIT_PER);
-	TimerLoadSet(TIMER0_BASE, TIMER_A, getTimePeriod(current_time_scale));
+	TimerLoadSet(TIMER0_BASE, TIMER_A, getTimePeriod(&configs));
 	IntEnable(INT_TIMER0A);
 	TimerEnable(TIMER0_BASE, TIMER_A);
 
@@ -164,7 +170,7 @@ int main(void)
 */
 	char blah[50];
 	int i;
-	for (i=0; i<NUM_SAMPLES_FRAME; i++) {
+	for (i=0; i < configs.num_samples_frame; i++) {
 		samples_array[i] = 0;
 	}
 
@@ -193,38 +199,37 @@ int main(void)
 			// continuous circuilar acquisition
 			samples_array[current_sample_index] = ADCRead();
 
-			if (hold_off_value > 0)
-				hold_off_value--;
+			if (configs.hold_off_value > 0)
+				configs.hold_off_value--;
 			else //hold_off_value == 0
 			{
 				if (!ctrl_trigger_detected)
 				{
 					//trigger detection
-					if (samples_array[current_sample_index] > current_trigger_level)
+					if (samples_array[current_sample_index] > configs.current_trigger_level)
 					{
 						ctrl_trigger_detected = TRUE;
 						//UARTPrintln("trigger on");
-						current_frame_start_index = getFrameStart(current_sample_index);
+						current_frame_start_index = getFrameStart(&configs, current_sample_index);
 						current_frame_start_index = current_frame_start_index;
 					}
 				}
 				else
 				{
 					// detect end of current frame
-					if ((current_frame_start_index == 0 && current_sample_index == NUM_SAMPLES_FRAME - 1)
+					if ((current_frame_start_index == 0 && current_sample_index == configs.num_samples_frame - 1)
 						|| (current_sample_index == current_frame_start_index - 1))
 					{
 						ctrl_trigger_detected = FALSE;
 						//UARTPrintln("trigger off");
-						sendSamplesFrame(current_time_scale, current_voltage_range, samples_array, current_frame_start_index);
-						hold_off_value = HOLD_OFF_START_VALUE;
+						sendSamplesFrame(&configs, samples_array, current_frame_start_index);
+
+						configs.hold_off_value = HOLD_OFF_START_VALUE;
 					}
 				}
-
-
 			}
 			current_sample_index++;
-			if (current_sample_index == NUM_SAMPLES_FRAME)
+			if (current_sample_index == configs.num_samples_frame)
 				current_sample_index = 0;
 		}
 #endif

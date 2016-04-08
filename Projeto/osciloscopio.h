@@ -36,11 +36,26 @@
 #define FALSE 0
 //#define PRINTF
 
+typedef struct _CONFIG {
+	unsigned char current_trigger_level;
+	unsigned int trigger_sample_offset;
+	unsigned char current_time_scale;
+	unsigned char current_voltage_range;
+	unsigned int hold_off_value;
+	unsigned int num_samples_frame;
+} CONFIG;
+
+#define MAX_SAMPLES_FRAME 1000
+
 /*********************************
  *
  * Phone -> uC communication
  *
  *********************************/
+#define MASK_COMMAND 0b10000000
+#define MASK_SUB_COMMAND 0b01100000
+#define MASK_COMMAND_VALUE 0b00011111
+
 #define COMMAND 0b10000000
 
 // TRIGGER LEVEL
@@ -50,7 +65,7 @@
 	when NUM_SAMPLES_FRAME/2, triggered sample will be at the middle of the sent frame
 	when NUM_SAMPLES_FRAME, triggered sample will be at the end of the sent frame
 */
-#define TRIGGER_SAMPLES_OFFSET 50
+#define INITIAL_TRIGGER_SAMPLES_OFFSET 50
 
 #define TRIGGER_LEVEL_0 0b00000000
 #define TRIGGER_LEVEL_100 0b00011110
@@ -79,8 +94,7 @@
 #define TIME_SCALE_1S 0b00001100
 
 // number of samples in a time frame (osciloscope screen)
-#define NUM_SAMPLES_FRAME 1000
-#define HOLD_OFF_START_VALUE NUM_SAMPLES_FRAME * 30
+#define HOLD_OFF_START_VALUE 0
 
 /*********************************
  *
@@ -97,11 +111,11 @@
  *
  *********************************/
 
-unsigned long getTimePeriod(unsigned long current_time_scale);
-void sendSamplesFrame(unsigned char current_time_scale, unsigned char current_voltage_range,
-		unsigned char *samples_array, unsigned int current_frame_start_index);
+void initializeConfiguration (CONFIG *configs);
+unsigned long getTimePeriod(CONFIG *configs);
+void sendSamplesFrame(CONFIG *configs, unsigned char *samples_array, unsigned int current_frame_start_index);
 unsigned char ADCRead();
-unsigned int getFrameStart(unsigned int current_index);
+unsigned int getFrameStart(CONFIG *configs, unsigned int current_index);
 void UARTPrint(char *string);
 void UARTPrintln(char *string);
 
