@@ -1,7 +1,7 @@
 #include "osciloscopio.h"
 
 void initializeConfiguration (CONFIG *configs) {
-	configs->ctrl_trigger_enabled = TRUE;
+	configs->ctrl_trigger_enabled = FALSE;
 	configs->current_trigger_level = 0x80;
 	configs->trigger_sample_offset = INITIAL_TRIGGER_SAMPLES_OFFSET;
 	configs->current_time_scale = TIME_SCALE_10MS;
