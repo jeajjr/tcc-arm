@@ -37,6 +37,7 @@
 //#define PRINTF
 
 typedef struct _CONFIG {
+	BOOL ctrl_trigger_enabled;
 	unsigned char current_trigger_level;
 	unsigned int trigger_sample_offset;
 	unsigned char current_time_scale;
@@ -113,6 +114,7 @@ typedef struct _CONFIG {
 
 void initializeConfiguration (CONFIG *configs);
 unsigned long getTimePeriod(CONFIG *configs);
+void parseCommand(CONFIG * configs, char command_received);
 void sendSamplesFrame(CONFIG *configs, unsigned char *samples_array, unsigned int current_frame_start_index);
 unsigned char ADCRead();
 unsigned int getFrameStart(CONFIG *configs, unsigned int current_index);

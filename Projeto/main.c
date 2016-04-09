@@ -13,10 +13,12 @@ void__error__(char *pcFilename, unsigned long ulLine)
  */
 CONFIG configs;
 
-BOOL ctrl_do_sample;
-BOOL ctrl_trigger_detected;
-BOOL crtl_hold_off;
+BOOL ctrl_do_sample = FALSE;
+BOOL ctrl_trigger_detected = FALSE;
+BOOL crtl_hold_off = FALSE;
+BOOL ctrl_parse_command = FALSE;
 
+char command_received;
 unsigned char samples_array[MAX_SAMPLES_FRAME];
 unsigned int current_sample_index = 0;
 unsigned int current_frame_start_index = 0;
@@ -37,8 +39,9 @@ void UART0IntHandler(void)
 	UARTIntClear(UART0_BASE, ulStatus); //clear the asserted interrupts
 	while(UARTCharsAvail(UART0_BASE)) //loop while there are chars
 	{
-		char a = UARTCharGetNonBlocking(UART0_BASE);
-		UARTCharPut(UART0_BASE, a);
+		command_received = UARTCharGetNonBlocking(UART0_BASE);
+
+		ctrl_parse_command = TRUE;
 
 		if (LED2)
 			{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2); LED2 = FALSE; }
@@ -154,7 +157,7 @@ int main(void)
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
 	TimerConfigure(TIMER1_BASE, TIMER_CFG_32_BIT_PER);
 	TimerLoadSet(TIMER1_BASE, TIMER_A, (SysCtlClockGet() * 0.0011)); //0.00001 = período de 20us
-																	//0.001 = período de 2ms
+																	 //0.001 = período de 2ms
 	IntEnable(INT_TIMER1A);
 	TimerEnable(TIMER1_BASE, TIMER_A);
 
@@ -170,12 +173,11 @@ int main(void)
 */
 	char blah[50];
 	int i;
-	for (i=0; i < configs.num_samples_frame; i++) {
+	for (i=0; i < MAX_SAMPLES_FRAME; i++) {
 		samples_array[i] = 0;
 	}
 
 /*
- *
  	 UARTPrintln("starting ...");
 	snprintf (blah, 50, "%d", (int) getTimePeriod(current_time_scale)); UARTPrintln(blah);
 
@@ -186,8 +188,8 @@ int main(void)
 
 	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_4, GPIO_PIN_4);
 	while(1);
-
  */
+
 	while(1)
 	{
 #define ENABLE
@@ -233,6 +235,12 @@ int main(void)
 				current_sample_index = 0;
 		}
 #endif
+
+		if(ctrl_parse_command) {
+			ctrl_parse_command = FALSE;
+
+			parseCommand(&configs, command_received);
+		}
 
 		//UARTCharPut(UART0_BASE, ADCRead());
 /*

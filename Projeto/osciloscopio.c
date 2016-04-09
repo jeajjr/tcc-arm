@@ -1,6 +1,7 @@
 #include "osciloscopio.h"
 
 void initializeConfiguration (CONFIG *configs) {
+	configs->ctrl_trigger_enabled = TRUE;
 	configs->current_trigger_level = 0x80;
 	configs->trigger_sample_offset = INITIAL_TRIGGER_SAMPLES_OFFSET;
 	configs->current_time_scale = TIME_SCALE_10MS;
@@ -42,6 +43,29 @@ unsigned long getTimePeriod(CONFIG *configs)
 	}
 
 	return 0;
+}
+
+void parseCommand(CONFIG * configs, char command_received) {
+	if ((command_received & MASK_COMMAND) == COMMAND) {
+		switch(command_received & MASK_SUB_COMMAND) {
+		case SET_TRIGGER_LEVEL:
+			if ((command_received & MASK_COMMAND_VALUE) == TRIGGER_LEVEL_OFF)
+				configs->ctrl_trigger_enabled = FALSE;
+			else {
+				configs->ctrl_trigger_enabled = TRUE;
+				configs->current_trigger_level = (unsigned char) ((command_received & MASK_COMMAND_VALUE) * 256 / TRIGGER_LEVEL_100);
+			}
+			break;
+		/*
+		case SET_VOLTAGE_RANGE:
+			break;
+		*/
+		case SET_TIME_SCALE:
+			configs->current_time_scale = (command_received & MASK_COMMAND_VALUE);
+			TimerLoadSet(TIMER0_BASE, TIMER_A, getTimePeriod(configs));
+			break;
+		}
+	}
 }
 
 void sendSamplesFrame(CONFIG *configs, unsigned char *samples_array, unsigned int current_frame_start_index)
