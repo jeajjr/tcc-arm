@@ -201,8 +201,8 @@ int main(void)
 			// continuous circuilar acquisition
 			samples_array[current_sample_index] = ADCRead();
 
-			if (configs.hold_off_value > 0)
-				configs.hold_off_value--;
+			if (configs.hold_off_current_value > 0)
+				configs.hold_off_current_value--;
 			else //hold_off_value == 0
 			{
 				if (!ctrl_trigger_detected)
@@ -226,7 +226,7 @@ int main(void)
 						//UARTPrintln("trigger off");
 						sendSamplesFrame(&configs, samples_array, current_frame_start_index);
 
-						configs.hold_off_value = HOLD_OFF_START_VALUE;
+						configs.hold_off_current_value = configs.hold_off_initial_value;
 					}
 				}
 			}

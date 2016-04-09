@@ -6,7 +6,8 @@ void initializeConfiguration (CONFIG *configs) {
 	configs->trigger_sample_offset = INITIAL_TRIGGER_SAMPLES_OFFSET;
 	configs->current_time_scale = TIME_SCALE_10MS;
 	configs->current_voltage_range = 0;
-	configs->hold_off_value = HOLD_OFF_START_VALUE;
+	configs->hold_off_initial_value = HOLD_OFF_START_VALUE;
+	configs->hold_off_current_value = HOLD_OFF_START_VALUE;
 	configs->num_samples_frame = 1000;
 }
 
@@ -64,6 +65,9 @@ void parseCommand(CONFIG * configs, char command_received) {
 			configs->current_time_scale = (command_received & MASK_COMMAND_VALUE);
 			TimerLoadSet(TIMER0_BASE, TIMER_A, getTimePeriod(configs));
 			break;
+
+		case SET_HOLD_OFF:
+			configs->hold_off_initial_value = ((command_received & MASK_COMMAND_VALUE) * configs->num_samples_frame * 10);
 		}
 	}
 }

@@ -42,7 +42,8 @@ typedef struct _CONFIG {
 	unsigned int trigger_sample_offset;
 	unsigned char current_time_scale;
 	unsigned char current_voltage_range;
-	unsigned int hold_off_value;
+	unsigned int hold_off_initial_value;
+	unsigned int hold_off_current_value;
 	unsigned int num_samples_frame;
 } CONFIG;
 
@@ -96,6 +97,11 @@ typedef struct _CONFIG {
 
 // number of samples in a time frame (osciloscope screen)
 #define HOLD_OFF_START_VALUE 0
+#define SET_HOLD_OFF 0b01100000
+
+#define HOLD_OFF_0 0b00000000
+#define HOLD_OFF_100 0b00011110
+#define HOLD_OFF_OFF 0b00011111
 
 /*********************************
  *
