@@ -12,6 +12,7 @@ GEN_CMDS__FLAG :=
 ORDERED_OBJS += \
 "./lm4f120h5qr_startup_ccs.obj" \
 "./main.obj" \
+"./osciloscopio.obj" \
 "../lm4f120h5qr.cmd" \
 $(GEN_CMDS__FLAG) \
 -l"libc.a" \
@@ -119,40 +120,40 @@ endif
 
 # Add inputs and outputs from these tool invocations to the build variables 
 EXE_OUTPUTS += \
-FirstSteps.out \
+TCC.out \
 
 EXE_OUTPUTS__QUOTED += \
-"FirstSteps.out" \
+"TCC.out" \
 
 BIN_OUTPUTS += \
-FirstSteps.hex \
+TCC.hex \
 
 BIN_OUTPUTS__QUOTED += \
-"FirstSteps.hex" \
+"TCC.hex" \
 
 
 # All Target
-all: FirstSteps.out
+all: TCC.out
 
 # Tool invocations
-FirstSteps.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
+TCC.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: ARM Linker'
-	"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_5.2.5/bin/armcl" -mv7M4 --code_state=16 --float_support=FPv4SPD16 --abi=eabi -me -g --gcc --define="ccs" --define=PART_LM4F120H5QR --diag_wrap=off --diag_warning=225 --display_error_number -z -m"FirstSteps.map" --heap_size=0 --stack_size=512 -i"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_5.2.5/lib" -i"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_5.2.5/include" --reread_libs --display_error_number --diag_wrap=off --warn_sections --xml_link_info="FirstSteps_linkInfo.xml" --rom_model -o "FirstSteps.out" $(ORDERED_OBJS)
+	"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_5.2.5/bin/armcl" -mv7M4 --code_state=16 --float_support=FPv4SPD16 --abi=eabi -me -g --gcc --define="ccs" --define=PART_LM4F120H5QR --diag_wrap=off --diag_warning=225 --display_error_number --printf_support=minimal -z -m"TCC.map" --heap_size=0 --stack_size=512 -i"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_5.2.5/lib" -i"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_5.2.5/include" --reread_libs --display_error_number --diag_wrap=off --warn_sections --xml_link_info="TCC_linkInfo.xml" --rom_model -o "TCC.out" $(ORDERED_OBJS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
-FirstSteps.hex: $(EXE_OUTPUTS)
+TCC.hex: $(EXE_OUTPUTS)
 	@echo 'Invoking: ARM Hex Utility'
-	"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_5.2.5/bin/armhex"  -o "FirstSteps.hex" $(EXE_OUTPUTS__QUOTED)
+	"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_5.2.5/bin/armhex"  -o "TCC.hex" $(EXE_OUTPUTS__QUOTED)
 	@echo 'Finished building: $@'
 	@echo ' '
 
 # Other Targets
 clean:
 	-$(RM) $(EXE_OUTPUTS__QUOTED)$(BIN_OUTPUTS__QUOTED)
-	-$(RM) "lm4f120h5qr_startup_ccs.pp" "main.pp" 
-	-$(RM) "lm4f120h5qr_startup_ccs.obj" "main.obj" 
+	-$(RM) "lm4f120h5qr_startup_ccs.pp" "main.pp" "osciloscopio.pp" 
+	-$(RM) "lm4f120h5qr_startup_ccs.obj" "main.obj" "osciloscopio.obj" 
 	-@echo 'Finished clean'
 	-@echo ' '
 
