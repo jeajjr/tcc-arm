@@ -4,7 +4,7 @@ void initializeConfiguration (CONFIG *configs) {
 	configs->ctrl_trigger_enabled = FALSE;
 	configs->current_trigger_level = 0x80;
 	configs->trigger_sample_offset = INITIAL_TRIGGER_SAMPLES_OFFSET;
-	configs->current_time_scale = TIME_SCALE_10MS;
+	configs->current_time_scale = TIME_SCALE_1S;
 	configs->current_voltage_range = 0;
 	configs->hold_off_value = HOLD_OFF_START_VALUE;
 	configs->num_samples_frame = 1000;
@@ -78,6 +78,8 @@ void sendSamplesFrame(CONFIG *configs, unsigned char *samples_array, unsigned in
 	UARTCharPut(UART0_BASE, 'U');
 	UARTCharPut(UART0_BASE, 'S');
 	UARTCharPut(UART0_BASE, 'P');
+	UARTCharPut(UART0_BASE, 'B');
+	UARTCharPut(UART0_BASE, 'K');
 	UARTCharPut(UART0_BASE, DATA | CHANNEL_1);
 	UARTCharPut(UART0_BASE, configs->current_voltage_range);
 	UARTCharPut(UART0_BASE, configs->current_time_scale);
@@ -130,7 +132,7 @@ unsigned int getFrameStart(CONFIG * configs, unsigned int current_index) {
 void UARTPrint(char *string) {
 	int i=0;
 	while (string[i] != '\0')
-		UARTCharPut(UART0_BASE, string[i++]);
+		UARTCharPutNonBlocking(UART0_BASE, string[i++]);
 }
 
 void UARTPrintln(char *string) {
@@ -139,5 +141,55 @@ void UARTPrintln(char *string) {
 		UARTCharPut(UART0_BASE, string[i++]);
 	UARTCharPut(UART0_BASE, '\n');
 	UARTCharPut(UART0_BASE, '\r');
+}
+
+unsigned int getContinuousModeSamplingSpacing(CONFIG *configs) {
+	int returnValue = 0;
+	switch(configs->current_time_scale)
+	{
+	case TIME_SCALE_10US:
+		returnValue = (int) (100000 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
+		break;
+	case TIME_SCALE_50US:
+		returnValue = (int) (20000 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
+		break;
+	case TIME_SCALE_100US:
+		returnValue = (int) (10000 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
+		break;
+	case TIME_SCALE_200US:
+		returnValue = (int) (5000 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
+		break;
+	case TIME_SCALE_500US:
+		returnValue = (int) (2000 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
+		break;
+	case TIME_SCALE_1MS:
+		returnValue = (int) (1000 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
+		break;
+	case TIME_SCALE_5MS:
+		returnValue = (int) (200 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
+		break;
+	case TIME_SCALE_10MS:
+		returnValue = (int) (100 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
+		break;
+	case TIME_SCALE_50MS:
+		returnValue = (int) (20 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
+		break;
+	case TIME_SCALE_100MS:
+		returnValue = (int) (10 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
+		break;
+	case TIME_SCALE_200MS:
+		returnValue = (int) (5 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
+		break;
+	case TIME_SCALE_500MS:
+		returnValue = (int) (2 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
+		break;
+	case TIME_SCALE_1S:
+		returnValue = (int) (1 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
+		break;
+	}
+
+	if (returnValue == 0)
+		return 1;
+	return (unsigned int) 2*returnValue;
 }
 

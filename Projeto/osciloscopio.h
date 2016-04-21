@@ -46,6 +46,8 @@ typedef struct _CONFIG {
 	unsigned int num_samples_frame;
 } CONFIG;
 
+#define CONTINUOUS_MODE_SAMPLES_SEC 1000
+
 #define MAX_SAMPLES_FRAME 1000
 
 /*********************************
@@ -120,6 +122,7 @@ unsigned char ADCRead();
 unsigned int getFrameStart(CONFIG *configs, unsigned int current_index);
 void UARTPrint(char *string);
 void UARTPrintln(char *string);
+unsigned int getContinuousModeSamplingSpacing(CONFIG *configs);
 
 #endif /* OSCILOSCOPIO_H_ */
 
