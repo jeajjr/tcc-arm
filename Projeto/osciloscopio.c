@@ -1,13 +1,13 @@
 #include "osciloscopio.h"
 
 void initializeConfiguration (CONFIG *configs) {
-	configs->ctrl_trigger_enabled = FALSE;
+	configs->ctrl_trigger_enabled = TRUE;
 	configs->current_trigger_level = 0x80;
 	configs->trigger_sample_offset = INITIAL_TRIGGER_SAMPLES_OFFSET;
-	configs->current_time_scale = TIME_SCALE_1S;
+	configs->current_time_scale = TIME_SCALE_10MS;
 	configs->current_voltage_range = 0;
-	configs->hold_off_value = HOLD_OFF_START_VALUE;
 	configs->num_samples_frame = 1000;
+	configs->hold_off_value = calculateHoldOffTicks(configs);
 }
 
 unsigned long getTimePeriod(CONFIG *configs)
@@ -61,11 +61,18 @@ void parseCommand(CONFIG * configs, char command_received) {
 			break;
 		*/
 		case SET_TIME_SCALE:
-			configs->current_time_scale = (command_received & MASK_COMMAND_VALUE);
-			TimerLoadSet(TIMER0_BASE, TIMER_A, getTimePeriod(configs));
+			if (configs->current_time_scale != (unsigned char) (command_received & MASK_COMMAND_VALUE)) {
+				configs->current_time_scale = (command_received & MASK_COMMAND_VALUE);
+
+				TimerLoadSet(TIMER0_BASE, TIMER_A, getTimePeriod(configs));
+			}
 			break;
 		}
 	}
+}
+
+int calculateHoldOffTicks(CONFIG *configs) {
+	return HOLD_OFF_START_VALUE; //return configs->num_samples_frame * 5;
 }
 
 void sendSamplesFrame(CONFIG *configs, unsigned char *samples_array, unsigned int current_frame_start_index)
@@ -75,24 +82,24 @@ void sendSamplesFrame(CONFIG *configs, unsigned char *samples_array, unsigned in
 	//U S P [DATA | CHANNEL] [VOLTAGE_SCALE] [TIME_SCALE] [DATA_LENGTH_H] [DATA_LENGTH_L] [DATA...] O K
 
 #ifndef PRINTF
-	UARTCharPut(UART0_BASE, 'U');
-	UARTCharPut(UART0_BASE, 'S');
-	UARTCharPut(UART0_BASE, 'P');
-	UARTCharPut(UART0_BASE, 'B');
-	UARTCharPut(UART0_BASE, 'K');
-	UARTCharPut(UART0_BASE, DATA | CHANNEL_1);
-	UARTCharPut(UART0_BASE, configs->current_voltage_range);
-	UARTCharPut(UART0_BASE, configs->current_time_scale);
-	UARTCharPut(UART0_BASE, (configs->num_samples_frame >> 8) & 0xFF);
-	UARTCharPut(UART0_BASE, configs->num_samples_frame & 0xFF);
+	UARTPrintChar('U');
+	UARTPrintChar('S');
+	UARTPrintChar('P');
+	UARTPrintChar('B');
+	UARTPrintChar('K');
+	UARTPrintChar(DATA | CHANNEL_1);
+	UARTPrintChar(configs->current_voltage_range);
+	UARTPrintChar(configs->current_time_scale);
+	UARTPrintChar((configs->num_samples_frame >> 8) & 0xFF);
+	UARTPrintChar(configs->num_samples_frame & 0xFF);
 
 	for (i = current_frame_start_index; i < configs->num_samples_frame; i++)
-			UARTCharPut(UART0_BASE, samples_array[i]);
+			UARTPrintChar(samples_array[i]);
 	for (i = 0; i < current_frame_start_index; i++)
-			UARTCharPut(UART0_BASE, samples_array[i]);
+			UARTPrintChar(samples_array[i]);
 
-	UARTCharPut(UART0_BASE, 'O');
-	UARTCharPut(UART0_BASE, 'K');
+	UARTPrintChar('O');
+	UARTPrintChar('K');
 #else
 	UARTPrintln("sample");
 	char buff[100];
@@ -129,18 +136,23 @@ unsigned int getFrameStart(CONFIG * configs, unsigned int current_index) {
 		return current_index - configs->trigger_sample_offset;
 }
 
+void UARTPrintChar(char a) {
+	UARTCharPutNonBlocking(UART0_BASE, a);
+	UARTCharPut(UART1_BASE, a);
+}
 void UARTPrint(char *string) {
 	int i=0;
 	while (string[i] != '\0')
-		UARTCharPutNonBlocking(UART0_BASE, string[i++]);
+		UARTPrintChar(string[i++]);
+		//UARTCharPutNonBlocking(UART0_BASE, string[i++]);
 }
 
 void UARTPrintln(char *string) {
 	int i=0;
 	while (string[i] != '\0')
-		UARTCharPut(UART0_BASE, string[i++]);
-	UARTCharPut(UART0_BASE, '\n');
-	UARTCharPut(UART0_BASE, '\r');
+		UARTPrintChar(string[i++]);
+	UARTPrintChar('\n');
+	UARTPrintChar('\r');
 }
 
 unsigned int getContinuousModeSamplingSpacing(CONFIG *configs) {

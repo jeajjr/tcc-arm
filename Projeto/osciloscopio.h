@@ -97,7 +97,8 @@ typedef struct _CONFIG {
 #define TIME_SCALE_1S 0b00001100
 
 // number of samples in a time frame (osciloscope screen)
-#define HOLD_OFF_START_VALUE 0
+#define HOLD_OFF_START_VALUE 40000
+#define HOLD_OFF_ACTIVE_PERC 30
 
 /*********************************
  *
@@ -117,9 +118,11 @@ typedef struct _CONFIG {
 void initializeConfiguration (CONFIG *configs);
 unsigned long getTimePeriod(CONFIG *configs);
 void parseCommand(CONFIG * configs, char command_received);
+int calculateHoldOffTicks(CONFIG *configs);
 void sendSamplesFrame(CONFIG *configs, unsigned char *samples_array, unsigned int current_frame_start_index);
 unsigned char ADCRead();
 unsigned int getFrameStart(CONFIG *configs, unsigned int current_index);
+void UARTPrintChar(char a);
 void UARTPrint(char *string);
 void UARTPrintln(char *string);
 unsigned int getContinuousModeSamplingSpacing(CONFIG *configs);

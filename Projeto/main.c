@@ -22,17 +22,22 @@ char command_received;
 unsigned char samples_array[MAX_SAMPLES_FRAME] = {0};
 unsigned int current_sample_index = 0;
 unsigned int current_frame_start_index = 0;
-unsigned int flango = 1;
+unsigned int continuousSamplingHoldOff = 1;
 
 int LED2 = 0;
 int limLED2 = 5;
 int LED3 = 0;
 int limLED3 = 50;
 int PWM = 0;
+int counter = 0;
+
 
 typedef enum {
+	CONTINUOUS,
 	TRIGGERED,
-	CONTINUOUS
+	HOLD_OFF_SLEEP,
+	HOLD_OFF_DETECT
+
 } STATES;
 STATES ctrl_current_state = CONTINUOUS;
 
@@ -71,8 +76,14 @@ void UART1IntHandler(void)
 	UARTIntClear(UART1_BASE, ulStatus); //clear the asserted interrupts
 	while(UARTCharsAvail(UART1_BASE)) //loop while there are chars
 	{
-		char a = UARTCharGetNonBlocking(UART1_BASE);
-		UARTCharPut(UART0_BASE, a);
+		command_received = UARTCharGetNonBlocking(UART1_BASE);
+
+		ctrl_parse_command = TRUE;
+
+		if (LED2)
+			{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2); LED2 = FALSE; }
+		else
+			{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0); LED2 = TRUE; }
 	}
 }
 
@@ -140,7 +151,7 @@ int main(void)
 	GPIOPinConfigure(GPIO_PA0_U0RX);
 	GPIOPinConfigure(GPIO_PA1_U0TX);
 	GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
-	UARTConfigSetExpClk(UART0_BASE, SysCtlClockGet(), 115200*2,
+	UARTConfigSetExpClk(UART0_BASE, SysCtlClockGet(), 460800,
 			(UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE | UART_CONFIG_PAR_NONE));
 
 	// UART 1
@@ -183,8 +194,8 @@ int main(void)
 	// Timer 1
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
 	TimerConfigure(TIMER1_BASE, TIMER_CFG_32_BIT_PER);
-	TimerLoadSet(TIMER1_BASE, TIMER_A, (SysCtlClockGet() * 0.05)); //0.00001 = período de 20us
-																	 //0.001 = período de 2ms
+	TimerLoadSet(TIMER1_BASE, TIMER_A, (SysCtlClockGet() * 0.00053)); //0.00001 = período de 20us
+																	  //0.001 = período de 2ms
 	IntEnable(INT_TIMER1A);
 	TimerEnable(TIMER1_BASE, TIMER_A);
 
@@ -211,7 +222,7 @@ int main(void)
 		samples_array[i] = 0;
 	}
 
-	snprintf (blah, 50, "Welcome!"); UARTPrintln(blah);
+//	snprintf (blah, 50, "Welcome!"); UARTPrintln(blah);
 
 /*
  	 UARTPrintln("starting ...");
@@ -243,34 +254,58 @@ int main(void)
 
 			switch(ctrl_current_state) {
 			case CONTINUOUS:
-				flango--;
-				if (flango == 0) {
-					UARTCharPut(UART0_BASE, samples_array[current_sample_index]);
-					flango = getContinuousModeSamplingSpacing(&configs);
+				continuousSamplingHoldOff--;
+				if (continuousSamplingHoldOff == 0) {
+					UARTPrintChar(samples_array[current_sample_index]);
+					continuousSamplingHoldOff = getContinuousModeSamplingSpacing(&configs);
 				}
+
 				//trigger detection
-				if (configs.ctrl_trigger_enabled && samples_array[current_sample_index] > configs.current_trigger_level)
+				if (configs.ctrl_trigger_enabled
+					&& samples_array[current_sample_index] > configs.current_trigger_level)
 				{
 					ctrl_current_state = TRIGGERED;
-					GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3);
 					current_frame_start_index = getFrameStart(&configs, current_sample_index);
-					current_frame_start_index = current_frame_start_index;
 				}
 				break;
 			case TRIGGERED:
-				if (configs.hold_off_value > 0)
-					configs.hold_off_value--;
 
 				// detect end of current frame
-				if ((current_frame_start_index == 0 && current_sample_index == configs.num_samples_frame - 1)
+				if (
+					((current_frame_start_index == 0 && current_sample_index == configs.num_samples_frame - 1)
 					|| (current_sample_index == current_frame_start_index - 1))
+					)
 				{
-					ctrl_current_state = CONTINUOUS;
+					ctrl_current_state = HOLD_OFF_SLEEP;
+					configs.hold_off_value = calculateHoldOffTicks(&configs);
 					GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0);
 					sendSamplesFrame(&configs, samples_array, current_frame_start_index);
-					configs.hold_off_value = HOLD_OFF_START_VALUE;
 				}
 
+				break;
+			case HOLD_OFF_SLEEP:
+				configs.hold_off_value--;
+				int limit = calculateHoldOffTicks(&configs) * HOLD_OFF_ACTIVE_PERC / 100;
+				if (configs.hold_off_value < limit)
+					ctrl_current_state = HOLD_OFF_DETECT;
+
+				break;
+			case HOLD_OFF_DETECT:
+				configs.hold_off_value--;
+
+				// Time's up, no trigger detected
+				if (configs.hold_off_value == 0) {
+					ctrl_current_state = CONTINUOUS;
+					break;
+				}
+
+				//trigger detection
+				if (configs.ctrl_trigger_enabled
+					&& samples_array[current_sample_index] > configs.current_trigger_level)
+				{
+					ctrl_current_state = TRIGGERED;
+					current_frame_start_index = getFrameStart(&configs, current_sample_index);
+				}
 				break;
 			}
 
