@@ -16,9 +16,10 @@ CONFIG configs;
 BOOL ctrl_do_sample = FALSE;
 BOOL ctrl_trigger_detected = FALSE;
 BOOL crtl_hold_off = FALSE;
-BOOL ctrl_parse_command = FALSE;
 
-char command_received;
+unsigned int limit;
+
+char command_received = 0;
 unsigned char samples_array[MAX_SAMPLES_FRAME] = {0};
 unsigned int current_sample_index = 0;
 unsigned int current_frame_start_index = 0;
@@ -31,13 +32,11 @@ int limLED3 = 50;
 int PWM = 0;
 int counter = 0;
 
-
 typedef enum {
 	CONTINUOUS,
 	TRIGGERED,
 	HOLD_OFF_SLEEP,
 	HOLD_OFF_DETECT
-
 } STATES;
 STATES ctrl_current_state = CONTINUOUS;
 
@@ -53,20 +52,11 @@ void UART0IntHandler(void)
 	{
 		command_received = UARTCharGetNonBlocking(UART0_BASE);
 
+		parseCommand(&configs, command_received);
+
 		UARTCharPut(UART0_BASE, command_received);
 		UARTCharPut(UART1_BASE, command_received);
-
-		ctrl_parse_command = TRUE;
-
-		if (LED2)
-			{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2); LED2 = FALSE; }
-		else
-			{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0); LED2 = TRUE; }
-
-
 	}
-
-
 }
 
 void UART1IntHandler(void)
@@ -76,14 +66,9 @@ void UART1IntHandler(void)
 	UARTIntClear(UART1_BASE, ulStatus); //clear the asserted interrupts
 	while(UARTCharsAvail(UART1_BASE)) //loop while there are chars
 	{
-		command_received = UARTCharGetNonBlocking(UART1_BASE);
+		command_received = UARTCharGet(UART1_BASE);
 
-		ctrl_parse_command = TRUE;
-
-		if (LED2)
-			{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2); LED2 = FALSE; }
-		else
-			{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0); LED2 = TRUE; }
+		parseCommand(&configs, command_received);
 	}
 }
 
@@ -93,14 +78,6 @@ void Timer0AIntHandler(void)
 	TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
 
 	ctrl_do_sample = TRUE;
-/*
-	// LED3 blinking logic
-	if (LED3)
-		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); LED3 = FALSE; }
-	else
-		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0); LED3 = TRUE; }
-
-*/
 }
 
 void Timer1AIntHandler(void)
@@ -121,13 +98,17 @@ void Timer2AIntHandler(void)
 {
 	// Clear the timer interrupt
 	TimerIntClear(TIMER2_BASE, TIMER_TIMA_TIMEOUT);
-	if (LED3)
-		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); LED3 = FALSE; }
-	else
-		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0); LED3 = TRUE; }
 
 	if (ctrl_current_state == CONTINUOUS)
 		UARTPrint("USPOK");
+
+}
+
+void blinkLED2() {
+	if (LED2)
+		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2); LED2 = FALSE; }
+	else
+		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0); LED2 = TRUE; }
 }
 
 /**
@@ -176,6 +157,7 @@ int main(void)
 	ADCSequenceStepConfigure(ADC0_BASE, 1, 3, ADC_CTL_CH0 | ADC_CTL_IE | ADC_CTL_END);
 	ADCSequenceEnable(ADC0_BASE, 1);
 
+
 	// ADC - sequencer 3
 /*
 	ADCSequenceDisable(ADC0_BASE, 3);
@@ -194,7 +176,7 @@ int main(void)
 	// Timer 1
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
 	TimerConfigure(TIMER1_BASE, TIMER_CFG_32_BIT_PER);
-	TimerLoadSet(TIMER1_BASE, TIMER_A, (SysCtlClockGet() * 0.00053)); //0.00001 = período de 20us
+	TimerLoadSet(TIMER1_BASE, TIMER_A, (SysCtlClockGet() * 0.001)); //0.00001 = período de 20us
 																	  //0.001 = período de 2ms
 	IntEnable(INT_TIMER1A);
 	TimerEnable(TIMER1_BASE, TIMER_A);
@@ -225,20 +207,28 @@ int main(void)
 //	snprintf (blah, 50, "Welcome!"); UARTPrintln(blah);
 
 /*
- 	 UARTPrintln("starting ...");
-	snprintf (blah, 50, "%d", (int) getTimePeriod(&configs)); UARTPrintln(blah);
+	snprintf (blah, 50, "%d", SysCtlClockGet()); UARTPrintln(blah);
+	unsigned long a, b, c = 10;
+	while (c--) {
+		a = (unsigned long) TimerValueGet(TIMER1_BASE, TIMER_A);
+		TimerEnable(TIMER1_BASE, TIMER_A);
+		ADCRead();
+		TimerDisable(TIMER1_BASE, TIMER_A);
+		b = (unsigned long) TimerValueGet(TIMER1_BASE, TIMER_A);
+		snprintf (blah, 50, "%d", a-b); UARTPrintln(blah);
+	}
 
-	TimerEnable(TIMER1_BASE, TIMER_A);
-	ADCRead();
-	TimerDisable(TIMER1_BASE, TIMER_A);
-	snprintf (blah, 50, "%d", (int) TimerValueGet(TIMER1_BASE, TIMER_A)); UARTPrintln(blah);
+	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);
+	c = 400000;
+	while (c--) {
+		ADCRead();
+	}
 
-	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_4, GPIO_PIN_4);
+	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3);
 	while(1);
-*/
 
 	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_4, GPIO_PIN_4);
-
+*/
 	UARTPrint("USPOK");
 
 	while(1)
@@ -252,61 +242,76 @@ int main(void)
 			// continuous circular acquisition
 			samples_array[current_sample_index] = ADCRead();
 
+			unsigned char previousSample;
+
 			switch(ctrl_current_state) {
 			case CONTINUOUS:
-				continuousSamplingHoldOff--;
-				if (continuousSamplingHoldOff == 0) {
+				if (continuousSamplingHoldOff != 0)
+					continuousSamplingHoldOff--;
+				else {
+					UARTCharPut(UART0_BASE, 0x02);
 					UARTPrintChar(samples_array[current_sample_index]);
 					continuousSamplingHoldOff = getContinuousModeSamplingSpacing(&configs);
 				}
-
-				//trigger detection
-				if (configs.ctrl_trigger_enabled
-					&& samples_array[current_sample_index] > configs.current_trigger_level)
-				{
-					ctrl_current_state = TRIGGERED;
-					current_frame_start_index = getFrameStart(&configs, current_sample_index);
-				}
 				break;
-			case TRIGGERED:
 
+			case TRIGGERED:
 				// detect end of current frame
 				if (
 					((current_frame_start_index == 0 && current_sample_index == configs.num_samples_frame - 1)
 					|| (current_sample_index == current_frame_start_index - 1))
 					)
 				{
+					UARTCharPut(UART0_BASE, 0x04);
 					ctrl_current_state = HOLD_OFF_SLEEP;
 					configs.hold_off_value = calculateHoldOffTicks(&configs);
+					limit = configs.hold_off_value * HOLD_OFF_ACTIVE_PERC / 100;
 					GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0);
 					sendSamplesFrame(&configs, samples_array, current_frame_start_index);
+
+					//blinkLED2();
 				}
-
 				break;
+
 			case HOLD_OFF_SLEEP:
-				configs.hold_off_value--;
-				int limit = calculateHoldOffTicks(&configs) * HOLD_OFF_ACTIVE_PERC / 100;
-				if (configs.hold_off_value < limit)
+				if (configs.hold_off_value < limit || configs.hold_off_value == 0)
 					ctrl_current_state = HOLD_OFF_DETECT;
-
+				else
+					configs.hold_off_value--;
 				break;
-			case HOLD_OFF_DETECT:
-				configs.hold_off_value--;
 
+			case HOLD_OFF_DETECT:
 				// Time's up, no trigger detected
 				if (configs.hold_off_value == 0) {
+					UARTCharPut(UART0_BASE, 0x07);
 					ctrl_current_state = CONTINUOUS;
+					//blinkLED2();
 					break;
 				}
+				else {
+					configs.hold_off_value--;
+				}
+				break;
+			}
 
-				//trigger detection
-				if (configs.ctrl_trigger_enabled
-					&& samples_array[current_sample_index] > configs.current_trigger_level)
+			//trigger detection
+			if (configs.trigger_configuration != DISABLED &&
+				(ctrl_current_state == CONTINUOUS || ctrl_current_state == HOLD_OFF_DETECT)) {
+				previousSample = samples_array[decrementIndex(current_sample_index, configs.num_samples_frame)];
+				if (
+					(configs.trigger_configuration == RISE
+							&& samples_array[current_sample_index] >= configs.current_trigger_level
+							&& previousSample < configs.current_trigger_level)
+					||
+					(configs.trigger_configuration == FALL
+							&& samples_array[current_sample_index] <= configs.current_trigger_level
+							&& previousSample > configs.current_trigger_level)
+					)
 				{
 					ctrl_current_state = TRIGGERED;
 					current_frame_start_index = getFrameStart(&configs, current_sample_index);
+					//blinkLED2();
 				}
-				break;
 			}
 
 			current_sample_index++;
@@ -314,12 +319,6 @@ int main(void)
 				current_sample_index = 0;
 		}
 #endif
-
-		if(ctrl_parse_command) {
-			ctrl_parse_command = FALSE;
-
-			parseCommand(&configs, command_received);
-		}
 
 		//UARTCharPut(UART0_BASE, ADCRead());
 /*

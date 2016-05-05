@@ -36,8 +36,10 @@
 #define FALSE 0
 //#define PRINTF
 
+typedef enum {DISABLED, RISE, FALL} TRIGGER_CONFIG;
+
 typedef struct _CONFIG {
-	BOOL ctrl_trigger_enabled;
+	TRIGGER_CONFIG trigger_configuration;
 	unsigned char current_trigger_level;
 	unsigned int trigger_sample_offset;
 	unsigned char current_time_scale;
@@ -97,7 +99,7 @@ typedef struct _CONFIG {
 #define TIME_SCALE_1S 0b00001100
 
 // number of samples in a time frame (osciloscope screen)
-#define HOLD_OFF_START_VALUE 40000
+#define HOLD_OFF_TIME_MS 1000
 #define HOLD_OFF_ACTIVE_PERC 30
 
 /*********************************
@@ -115,13 +117,17 @@ typedef struct _CONFIG {
  *
  *********************************/
 
+#include "osciloscopio.h"
+
 void initializeConfiguration (CONFIG *configs);
+unsigned int decrementIndex(unsigned int value, unsigned int limit);
 unsigned long getTimePeriod(CONFIG *configs);
 void parseCommand(CONFIG * configs, char command_received);
-int calculateHoldOffTicks(CONFIG *configs);
+void updateNumSamplesFrame(CONFIG *configs);
+unsigned int calculateHoldOffTicks(CONFIG *configs);
 void sendSamplesFrame(CONFIG *configs, unsigned char *samples_array, unsigned int current_frame_start_index);
 unsigned char ADCRead();
-unsigned int getFrameStart(CONFIG *configs, unsigned int current_index);
+unsigned int getFrameStart(CONFIG * configs, unsigned int current_index);
 void UARTPrintChar(char a);
 void UARTPrint(char *string);
 void UARTPrintln(char *string);

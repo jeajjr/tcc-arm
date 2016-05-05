@@ -1,13 +1,20 @@
 #include "osciloscopio.h"
 
 void initializeConfiguration (CONFIG *configs) {
-	configs->ctrl_trigger_enabled = TRUE;
+	configs->trigger_configuration = RISE;
 	configs->current_trigger_level = 0x80;
 	configs->trigger_sample_offset = INITIAL_TRIGGER_SAMPLES_OFFSET;
-	configs->current_time_scale = TIME_SCALE_10MS;
+	configs->current_time_scale = TIME_SCALE_500MS;
 	configs->current_voltage_range = 0;
-	configs->num_samples_frame = 1000;
+	configs->num_samples_frame = MAX_SAMPLES_FRAME;
 	configs->hold_off_value = calculateHoldOffTicks(configs);
+}
+
+unsigned int decrementIndex(unsigned int value, unsigned int limit) {
+	if (value != 0)
+		return value - 1;
+
+	return limit - 1;
 }
 
 unsigned long getTimePeriod(CONFIG *configs)
@@ -15,31 +22,31 @@ unsigned long getTimePeriod(CONFIG *configs)
 	switch(configs->current_time_scale)
 	{
 	case TIME_SCALE_10US:
-		return (unsigned long) ((SysCtlClockGet() * 0.00001) / configs->num_samples_frame);
+		return 500;
 	case TIME_SCALE_50US:
-		return (unsigned long) ((SysCtlClockGet() * 0.00005) / configs->num_samples_frame);
+		return 500;
 	case TIME_SCALE_100US:
-		return (unsigned long) ((SysCtlClockGet() * 0.0001) / configs->num_samples_frame);
+		return 500;
 	case TIME_SCALE_200US:
-		return (unsigned long) ((SysCtlClockGet() * 0.0002) / configs->num_samples_frame);
+		return 500;
 	case TIME_SCALE_500US:
-		return (unsigned long) ((SysCtlClockGet() * 0.0005) / configs->num_samples_frame);
+		return 500;
 	case TIME_SCALE_1MS:
-		return (unsigned long) ((SysCtlClockGet() * 0.001) / configs->num_samples_frame);
+		return 500;
 	case TIME_SCALE_5MS:
-		return (unsigned long) ((SysCtlClockGet() * 0.005) / configs->num_samples_frame);
+		return 500;
 	case TIME_SCALE_10MS:
-		return (unsigned long) ((SysCtlClockGet() * 0.01) / configs->num_samples_frame);
+		return 500;
 	case TIME_SCALE_50MS:
-		return (unsigned long) ((SysCtlClockGet() * 0.05) / configs->num_samples_frame);
+		return 2500;
 	case TIME_SCALE_100MS:
-		return (unsigned long) ((SysCtlClockGet() * 0.1) / configs->num_samples_frame);
+		return 5000;
 	case TIME_SCALE_200MS:
-		return (unsigned long) ((SysCtlClockGet() * 0.2) / configs->num_samples_frame);
+		return 10000;
 	case TIME_SCALE_500MS:
-		return (unsigned long) ((SysCtlClockGet() * 0.5) / configs->num_samples_frame);
+		return 25000;
 	case TIME_SCALE_1S:
-		return (unsigned long) ((SysCtlClockGet() * 1) / configs->num_samples_frame);
+		return 50000;
 	}
 
 	return 0;
@@ -50,9 +57,10 @@ void parseCommand(CONFIG * configs, char command_received) {
 		switch(command_received & MASK_SUB_COMMAND) {
 		case SET_TRIGGER_LEVEL:
 			if ((command_received & MASK_COMMAND_VALUE) == TRIGGER_LEVEL_OFF)
-				configs->ctrl_trigger_enabled = FALSE;
+				configs->trigger_configuration = DISABLED;
 			else {
-				configs->ctrl_trigger_enabled = TRUE;
+
+				configs->trigger_configuration = RISE; //TODO
 				configs->current_trigger_level = (unsigned char) ((command_received & MASK_COMMAND_VALUE) * 256 / TRIGGER_LEVEL_100);
 			}
 			break;
@@ -64,15 +72,94 @@ void parseCommand(CONFIG * configs, char command_received) {
 			if (configs->current_time_scale != (unsigned char) (command_received & MASK_COMMAND_VALUE)) {
 				configs->current_time_scale = (command_received & MASK_COMMAND_VALUE);
 
-				TimerLoadSet(TIMER0_BASE, TIMER_A, getTimePeriod(configs));
+				unsigned long newTimePeriod = getTimePeriod(configs);
+				updateNumSamplesFrame(configs);
+
+				TimerLoadSet(TIMER0_BASE, TIMER_A, newTimePeriod);
 			}
 			break;
 		}
 	}
 }
 
-int calculateHoldOffTicks(CONFIG *configs) {
-	return HOLD_OFF_START_VALUE; //return configs->num_samples_frame * 5;
+void updateNumSamplesFrame(CONFIG *configs) {
+	switch(configs->current_time_scale) {
+	case TIME_SCALE_10US:
+		configs->num_samples_frame = 1;
+		break;
+	case TIME_SCALE_50US:
+		configs->num_samples_frame = 5;
+		break;
+	case TIME_SCALE_100US:
+		configs->num_samples_frame = 10;
+		break;
+	case TIME_SCALE_200US:
+		configs->num_samples_frame = 20;
+		break;
+	case TIME_SCALE_500US:
+		configs->num_samples_frame = 50;
+		break;
+	case TIME_SCALE_1MS:
+		configs->num_samples_frame = 100;
+		break;
+	case TIME_SCALE_5MS:
+		configs->num_samples_frame = 500;
+		break;
+	case TIME_SCALE_10MS:
+		configs->num_samples_frame = 1000;
+		break;
+	case TIME_SCALE_50MS:
+		configs->num_samples_frame = 1000;
+		break;
+	case TIME_SCALE_100MS:
+		configs->num_samples_frame = 1000;
+		break;
+	case TIME_SCALE_200MS:
+		configs->num_samples_frame = 1000;
+		break;
+	case TIME_SCALE_500MS:
+		configs->num_samples_frame = 1000;
+		break;
+	case TIME_SCALE_1S:
+		configs->num_samples_frame = 1000;
+		break;
+	}
+}
+
+unsigned int calculateHoldOffTicks(CONFIG *configs) {
+//	return HOLD_OFF_TIME_MS; //return configs->num_samples_frame * 5;
+
+	switch(configs->current_time_scale)
+	{
+	case TIME_SCALE_10US:
+		return 99999;
+	case TIME_SCALE_50US:
+		return 99995;
+	case TIME_SCALE_100US:
+		return 99990;
+	case TIME_SCALE_200US:
+		return 99980;
+	case TIME_SCALE_500US:
+		return 99950;
+	case TIME_SCALE_1MS:
+		return 99900;
+	case TIME_SCALE_5MS:
+		return 39800;
+	case TIME_SCALE_10MS:
+		return 99000;
+	case TIME_SCALE_50MS:
+		return 19000;
+	case TIME_SCALE_100MS:
+		return 9000;
+	case TIME_SCALE_200MS:
+		return 4000;
+	case TIME_SCALE_500MS:
+		return 1000;
+	case TIME_SCALE_1S:
+		return 1000;
+	}
+
+	return 0;
 }
 
 void sendSamplesFrame(CONFIG *configs, unsigned char *samples_array, unsigned int current_frame_start_index)
@@ -137,14 +224,13 @@ unsigned int getFrameStart(CONFIG * configs, unsigned int current_index) {
 }
 
 void UARTPrintChar(char a) {
-	UARTCharPutNonBlocking(UART0_BASE, a);
-	UARTCharPut(UART1_BASE, a);
+	UARTCharPutNonBlocking(UART1_BASE, a);
+	UARTCharPut(UART0_BASE, a);
 }
 void UARTPrint(char *string) {
 	int i=0;
 	while (string[i] != '\0')
 		UARTPrintChar(string[i++]);
-		//UARTCharPutNonBlocking(UART0_BASE, string[i++]);
 }
 
 void UARTPrintln(char *string) {
@@ -156,52 +242,35 @@ void UARTPrintln(char *string) {
 }
 
 unsigned int getContinuousModeSamplingSpacing(CONFIG *configs) {
-	int returnValue = 0;
 	switch(configs->current_time_scale)
 	{
 	case TIME_SCALE_10US:
-		returnValue = (int) (100000 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
-		break;
-	case TIME_SCALE_50US:
-		returnValue = (int) (20000 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
-		break;
-	case TIME_SCALE_100US:
-		returnValue = (int) (10000 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
-		break;
-	case TIME_SCALE_200US:
-		returnValue = (int) (5000 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
-		break;
-	case TIME_SCALE_500US:
-		returnValue = (int) (2000 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
-		break;
-	case TIME_SCALE_1MS:
-		returnValue = (int) (1000 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
-		break;
-	case TIME_SCALE_5MS:
-		returnValue = (int) (200 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
-		break;
-	case TIME_SCALE_10MS:
-		returnValue = (int) (100 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
-		break;
-	case TIME_SCALE_50MS:
-		returnValue = (int) (20 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
-		break;
-	case TIME_SCALE_100MS:
-		returnValue = (int) (10 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
-		break;
-	case TIME_SCALE_200MS:
-		returnValue = (int) (5 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
-		break;
-	case TIME_SCALE_500MS:
-		returnValue = (int) (2 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
-		break;
-	case TIME_SCALE_1S:
-		returnValue = (int) (1 * configs->num_samples_frame / CONTINUOUS_MODE_SAMPLES_SEC);
-		break;
-	}
-
-	if (returnValue == 0)
 		return 1;
-	return (unsigned int) 2*returnValue;
+	case TIME_SCALE_50US:
+		return 5;
+	case TIME_SCALE_100US:
+		return 10;
+	case TIME_SCALE_200US:
+		return 20;
+	case TIME_SCALE_500US:
+		return 50;
+	case TIME_SCALE_1MS:
+		return 100;
+	case TIME_SCALE_5MS:
+		return 500;
+	case TIME_SCALE_10MS:
+		return 1000;
+	case TIME_SCALE_50MS:
+		return 1000;
+	case TIME_SCALE_100MS:
+		return 1000;
+	case TIME_SCALE_200MS:
+		return 1000;
+	case TIME_SCALE_500MS:
+		return 1000;
+	case TIME_SCALE_1S:
+		return 1000;
+	}
+	return 1000;
 }
 
