@@ -7,7 +7,7 @@ void initializeConfiguration (CONFIG *configs) {
 	configs->current_time_scale = TIME_SCALE_500MS;
 	configs->current_voltage_range = 0;
 	configs->num_samples_frame = MAX_SAMPLES_FRAME;
-	configs->hold_off_value = calculateHoldOffTicks(configs);
+	configs->hold_off_value = HOLD_OFF_MIN;
 }
 
 unsigned int decrementIndex(unsigned int value, unsigned int limit) {
@@ -64,10 +64,11 @@ void parseCommand(CONFIG * configs, char command_received) {
 				configs->current_trigger_level = (unsigned char) ((command_received & MASK_COMMAND_VALUE) * 256 / TRIGGER_LEVEL_100);
 			}
 			break;
-		/*
-		case SET_VOLTAGE_RANGE:
+
+		case SET_HOLD_OFF:
+			configs->hold_off_value = (unsigned char) (command_received & MASK_COMMAND_VALUE);
 			break;
-		*/
+
 		case SET_TIME_SCALE:
 			if (configs->current_time_scale != (unsigned char) (command_received & MASK_COMMAND_VALUE)) {
 				configs->current_time_scale = (command_received & MASK_COMMAND_VALUE);
@@ -126,9 +127,55 @@ void updateNumSamplesFrame(CONFIG *configs) {
 	}
 }
 
-unsigned int calculateHoldOffTicks(CONFIG *configs) {
-//	return HOLD_OFF_TIME_MS; //return configs->num_samples_frame * 5;
+unsigned int calculateHoldOffSleepTicks(CONFIG *configs) {
+	unsigned int returnVal = 0;
+	switch(configs->current_time_scale)
+	{
+	case TIME_SCALE_10US:
+		returnVal = 12500;
+		break;
+	case TIME_SCALE_50US:
+		returnVal = 12499;
+		break;
+	case TIME_SCALE_100US:
+		returnVal = 12499;
+		break;
+	case TIME_SCALE_200US:
+		returnVal = 12498;
+		break;
+	case TIME_SCALE_500US:
+		returnVal = 12494;
+		break;
+	case TIME_SCALE_1MS:
+		returnVal = 12488;
+		break;
+	case TIME_SCALE_5MS:
+		returnVal = 12438;
+		break;
+	case TIME_SCALE_10MS:
+		returnVal = 12375;
+		break;
+	case TIME_SCALE_50MS:
+		returnVal = 2375;
+		break;
+	case TIME_SCALE_100MS:
+		returnVal = 1125;
+		break;
+	case TIME_SCALE_200MS:
+		returnVal = 500;
+		break;
+	case TIME_SCALE_500MS:
+		returnVal = 125;
+		break;
+	case TIME_SCALE_1S:
+		returnVal = 0;
+		break;
+	}
 
+	return returnVal * configs->hold_off_value;
+}
+
+unsigned int calculateHoldOffTicks(CONFIG *configs) {
 	switch(configs->current_time_scale)
 	{
 	case TIME_SCALE_10US:
@@ -242,6 +289,8 @@ void UARTPrintln(char *string) {
 }
 
 unsigned int getContinuousModeSamplingSpacing(CONFIG *configs) {
+
+	return 1;
 	switch(configs->current_time_scale)
 	{
 	case TIME_SCALE_10US:

@@ -63,24 +63,34 @@ typedef struct _CONFIG {
 
 #define COMMAND 0b10000000
 
-// TRIGGER LEVEL
+/**************************************************
+ *                  TRIGGER LEVEL
+ *************************************************/
+
 #define SET_TRIGGER_LEVEL 0b00000000
 /* trigger offset:
 	when 0, triggered sample will be at the start of the sent frame
 	when NUM_SAMPLES_FRAME/2, triggered sample will be at the middle of the sent frame
 	when NUM_SAMPLES_FRAME, triggered sample will be at the end of the sent frame
 */
-#define INITIAL_TRIGGER_SAMPLES_OFFSET 50
+#define INITIAL_TRIGGER_SAMPLES_OFFSET 400
 
 #define TRIGGER_LEVEL_0 0b00000000
 #define TRIGGER_LEVEL_100 0b00011110
 #define TRIGGER_LEVEL_OFF 0b00011111
 
-// VOLTAGE RANGE
-	/*
-#define SET_VOLTAGE_RANGE 0b00100000
-	*/
 
+/**************************************************
+ *              HOLD OFF LENGTH
+ *************************************************/
+#define SET_HOLD_OFF 0b00100000
+
+#define HOLD_OFF_MIN 0b00000001 // 1/8 of holdoff length
+#define HOLD_OFF_MAX 0b00000111 // 7/8 of holdoff length
+
+/**************************************************
+ *                  TIME SCALE
+ *************************************************/
 // TIME SCALE
 #define SET_TIME_SCALE 0b01000000
 
@@ -100,7 +110,7 @@ typedef struct _CONFIG {
 
 // number of samples in a time frame (osciloscope screen)
 #define HOLD_OFF_TIME_MS 1000
-#define HOLD_OFF_ACTIVE_PERC 30
+#define HOLD_OFF_ACTIVE_PERC 80
 
 /*********************************
  *

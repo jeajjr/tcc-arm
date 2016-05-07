@@ -24,6 +24,7 @@ unsigned char samples_array[MAX_SAMPLES_FRAME] = {0};
 unsigned int current_sample_index = 0;
 unsigned int current_frame_start_index = 0;
 unsigned int continuousSamplingHoldOff = 1;
+unsigned int hold_off_counter = 0;
 
 int LED2 = 0;
 int limLED2 = 5;
@@ -39,6 +40,13 @@ typedef enum {
 	HOLD_OFF_DETECT
 } STATES;
 STATES ctrl_current_state = CONTINUOUS;
+
+void blinkLED2() {
+	if (LED2)
+		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2); LED2 = FALSE; }
+	else
+		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0); LED2 = TRUE; }
+}
 
 /**
  * INTERRUPT HANDLERS
@@ -85,12 +93,12 @@ void Timer1AIntHandler(void)
 	// Clear the timer interrupt
 	TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
 	PWM++;
-	if (PWM == 4 || PWM == 6)
+	if (PWM == 4 || PWM == 6 || PWM == 11 || PWM == 20)
 		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_4, GPIO_PIN_4);  }
 	else
 		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_4, 0);  }
 
-	if (PWM == 10)
+	if (PWM == 50)
 		PWM = 0;
 }
 
@@ -99,16 +107,11 @@ void Timer2AIntHandler(void)
 	// Clear the timer interrupt
 	TimerIntClear(TIMER2_BASE, TIMER_TIMA_TIMEOUT);
 
+	blinkLED2();
+
 	if (ctrl_current_state == CONTINUOUS)
 		UARTPrint("USPOK");
 
-}
-
-void blinkLED2() {
-	if (LED2)
-		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2); LED2 = FALSE; }
-	else
-		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0); LED2 = TRUE; }
 }
 
 /**
@@ -176,7 +179,7 @@ int main(void)
 	// Timer 1
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
 	TimerConfigure(TIMER1_BASE, TIMER_CFG_32_BIT_PER);
-	TimerLoadSet(TIMER1_BASE, TIMER_A, (SysCtlClockGet() * 0.001)); //0.00001 = período de 20us
+	TimerLoadSet(TIMER1_BASE, TIMER_A, (SysCtlClockGet() * 0.0011)); //0.00001 = período de 20us
 																	  //0.001 = período de 2ms
 	IntEnable(INT_TIMER1A);
 	TimerEnable(TIMER1_BASE, TIMER_A);
@@ -249,7 +252,6 @@ int main(void)
 				if (continuousSamplingHoldOff != 0)
 					continuousSamplingHoldOff--;
 				else {
-					UARTCharPut(UART0_BASE, 0x02);
 					UARTPrintChar(samples_array[current_sample_index]);
 					continuousSamplingHoldOff = getContinuousModeSamplingSpacing(&configs);
 				}
@@ -262,34 +264,30 @@ int main(void)
 					|| (current_sample_index == current_frame_start_index - 1))
 					)
 				{
-					UARTCharPut(UART0_BASE, 0x04);
 					ctrl_current_state = HOLD_OFF_SLEEP;
-					configs.hold_off_value = calculateHoldOffTicks(&configs);
-					limit = configs.hold_off_value * HOLD_OFF_ACTIVE_PERC / 100;
+					hold_off_counter = calculateHoldOffTicks(&configs);
+					limit = calculateHoldOffSleepTicks(&configs);
 					GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0);
 					sendSamplesFrame(&configs, samples_array, current_frame_start_index);
 
-					//blinkLED2();
 				}
 				break;
 
 			case HOLD_OFF_SLEEP:
-				if (configs.hold_off_value < limit || configs.hold_off_value == 0)
+				if (hold_off_counter < limit || hold_off_counter == 0)
 					ctrl_current_state = HOLD_OFF_DETECT;
 				else
-					configs.hold_off_value--;
+					hold_off_counter--;
 				break;
 
 			case HOLD_OFF_DETECT:
 				// Time's up, no trigger detected
-				if (configs.hold_off_value == 0) {
-					UARTCharPut(UART0_BASE, 0x07);
+				if (hold_off_counter == 0) {
 					ctrl_current_state = CONTINUOUS;
-					//blinkLED2();
 					break;
 				}
 				else {
-					configs.hold_off_value--;
+					hold_off_counter--;
 				}
 				break;
 			}
@@ -310,7 +308,6 @@ int main(void)
 				{
 					ctrl_current_state = TRIGGERED;
 					current_frame_start_index = getFrameStart(&configs, current_sample_index);
-					//blinkLED2();
 				}
 			}
 
