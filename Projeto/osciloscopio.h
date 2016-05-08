@@ -50,7 +50,7 @@ typedef struct _CONFIG {
 
 #define CONTINUOUS_MODE_SAMPLES_SEC 1000
 
-#define MAX_SAMPLES_FRAME 1000
+#define BUFFER_SIZE 2048
 
 /*********************************
  *
@@ -126,22 +126,27 @@ typedef struct _CONFIG {
  * METHODS PROTOTYPES
  *
  *********************************/
-
-#include "osciloscopio.h"
-
 void initializeConfiguration (CONFIG *configs);
+
+unsigned int incrementIndex(unsigned int index);
 unsigned int decrementIndex(unsigned int value, unsigned int limit);
-unsigned long getTimePeriod(CONFIG *configs);
-void parseCommand(CONFIG * configs, char command_received);
-void updateNumSamplesFrame(CONFIG *configs);
-unsigned int calculateHoldOffTicks(CONFIG *configs);
-void sendSamplesFrame(CONFIG *configs, unsigned char *samples_array, unsigned int current_frame_start_index);
-unsigned char ADCRead();
+
 unsigned int getFrameStart(CONFIG * configs, unsigned int current_index);
+void parseCommand(CONFIG * configs, char command_received);
+
+unsigned char ADCRead();
+
 void UARTPrintChar(char a);
 void UARTPrint(char *string);
 void UARTPrintln(char *string);
+void sendSamplesFrame(CONFIG *configs, unsigned char *samples_array, unsigned int current_frame_start_index);
+
+unsigned long getTimePeriod(CONFIG *configs);
+void updateNumSamplesFrame(CONFIG *configs);
+unsigned int calculateHoldOffSleepTicks(CONFIG *configs);
+unsigned int calculateHoldOffTicks(CONFIG *configs);
 unsigned int getContinuousModeSamplingSpacing(CONFIG *configs);
+void initializeHardware(CONFIG *configs);
 
 #endif /* OSCILOSCOPIO_H_ */
 

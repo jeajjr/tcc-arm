@@ -20,7 +20,7 @@ BOOL crtl_hold_off = FALSE;
 unsigned int limit;
 
 char command_received = 0;
-unsigned char samples_array[MAX_SAMPLES_FRAME] = {0};
+unsigned char samples_array[BUFFER_SIZE] = {0};
 unsigned int current_sample_index = 0;
 unsigned int current_frame_start_index = 0;
 unsigned int continuousSamplingHoldOff = 1;
@@ -31,7 +31,6 @@ int limLED2 = 5;
 int LED3 = 0;
 int limLED3 = 50;
 int PWM = 0;
-int counter = 0;
 
 typedef enum {
 	CONTINUOUS,
@@ -93,7 +92,7 @@ void Timer1AIntHandler(void)
 	// Clear the timer interrupt
 	TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
 	PWM++;
-	if (PWM == 4 || PWM == 6 || PWM == 11 || PWM == 20)
+	if (PWM%2)//PWM == 4 || PWM == 6 || PWM == 11 || PWM == 20)
 		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_4, GPIO_PIN_4);  }
 	else
 		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_4, 0);  }
@@ -111,7 +110,6 @@ void Timer2AIntHandler(void)
 
 	if (ctrl_current_state == CONTINUOUS)
 		UARTPrint("USPOK");
-
 }
 
 /**
@@ -121,123 +119,14 @@ int main(void)
 {
 	initializeConfiguration(&configs);
 
-	// clock
-	SysCtlClockSet(SYSCTL_SYSDIV_4|SYSCTL_USE_PLL|SYSCTL_XTAL_16MHZ|SYSCTL_OSC_MAIN);
+	initializeHardware(&configs);
 
-	// LED
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
-	GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4);
-	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4, 0);
+	//test();
 
-	// UART 0
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
-	GPIOPinConfigure(GPIO_PA0_U0RX);
-	GPIOPinConfigure(GPIO_PA1_U0TX);
-	GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
-	UARTConfigSetExpClk(UART0_BASE, SysCtlClockGet(), 460800,
-			(UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE | UART_CONFIG_PAR_NONE));
-
-	// UART 1
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_UART1);
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOC);
-	GPIOPinConfigure(GPIO_PC4_U1RX);
-	GPIOPinConfigure(GPIO_PC5_U1TX);
-	GPIOPinTypeUART(GPIO_PORTC_BASE, GPIO_PIN_4 | GPIO_PIN_5);
-	UARTConfigSetExpClk(UART1_BASE, SysCtlClockGet(), 460800,
-			(UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE | UART_CONFIG_PAR_NONE));
-
-	// ADC
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
-	SysCtlADCSpeedSet(SYSCTL_ADCSPEED_1MSPS);//SYSCTL_ADCSPEED_500KSPS
-
-	// ADC - sequencer 1
-	ADCSequenceDisable(ADC0_BASE, 1);
-	ADCSequenceConfigure(ADC0_BASE, 1, ADC_TRIGGER_PROCESSOR, 0);
-	ADCSequenceStepConfigure(ADC0_BASE, 1, 0, ADC_CTL_CH0);
-	ADCSequenceStepConfigure(ADC0_BASE, 1, 1, ADC_CTL_CH0);
-	ADCSequenceStepConfigure(ADC0_BASE, 1, 2, ADC_CTL_CH0);
-	ADCSequenceStepConfigure(ADC0_BASE, 1, 3, ADC_CTL_CH0 | ADC_CTL_IE | ADC_CTL_END);
-	ADCSequenceEnable(ADC0_BASE, 1);
-
-
-	// ADC - sequencer 3
-/*
-	ADCSequenceDisable(ADC0_BASE, 3);
-	ADCSequenceConfigure(ADC0_BASE, 3, ADC_TRIGGER_PROCESSOR, 0);
-	ADCSequenceStepConfigure(ADC0_BASE, 3, 0, ADC_CTL_CH0 | ADC_CTL_IE | ADC_CTL_END);
-	ADCSequenceEnable(ADC0_BASE, 3);
-*/
-
-	// Timer 0
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
-	TimerConfigure(TIMER0_BASE, TIMER_CFG_32_BIT_PER);
-	TimerLoadSet(TIMER0_BASE, TIMER_A, getTimePeriod(&configs));
-	IntEnable(INT_TIMER0A);
-	TimerEnable(TIMER0_BASE, TIMER_A);
-
-	// Timer 1
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
-	TimerConfigure(TIMER1_BASE, TIMER_CFG_32_BIT_PER);
-	TimerLoadSet(TIMER1_BASE, TIMER_A, (SysCtlClockGet() * 0.0011)); //0.00001 = período de 20us
-																	  //0.001 = período de 2ms
-	IntEnable(INT_TIMER1A);
-	TimerEnable(TIMER1_BASE, TIMER_A);
-
-	// Timer 2
-	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER2);
-	TimerConfigure(TIMER2_BASE, TIMER_CFG_32_BIT_PER);
-	TimerLoadSet(TIMER2_BASE, TIMER_A, (SysCtlClockGet() * 1)); //1Hz
-	IntEnable(INT_TIMER2A);
-	TimerEnable(TIMER2_BASE, TIMER_A);
-
-	// interruptions
-	IntMasterEnable();
-	TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
-	TimerIntEnable(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
-	TimerIntEnable(TIMER2_BASE, TIMER_TIMA_TIMEOUT);
-	IntEnable(INT_UART0);
-	UARTIntEnable(UART0_BASE, UART_INT_RX | UART_INT_RT);
-	IntEnable(INT_UART1);
-	UARTIntEnable(UART1_BASE, UART_INT_RX | UART_INT_RT);
-
-	char blah[50];
-	int i;
-	for (i=0; i < MAX_SAMPLES_FRAME; i++) {
-		samples_array[i] = 0;
-	}
-
-//	snprintf (blah, 50, "Welcome!"); UARTPrintln(blah);
-
-/*
-	snprintf (blah, 50, "%d", SysCtlClockGet()); UARTPrintln(blah);
-	unsigned long a, b, c = 10;
-	while (c--) {
-		a = (unsigned long) TimerValueGet(TIMER1_BASE, TIMER_A);
-		TimerEnable(TIMER1_BASE, TIMER_A);
-		ADCRead();
-		TimerDisable(TIMER1_BASE, TIMER_A);
-		b = (unsigned long) TimerValueGet(TIMER1_BASE, TIMER_A);
-		snprintf (blah, 50, "%d", a-b); UARTPrintln(blah);
-	}
-
-	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);
-	c = 400000;
-	while (c--) {
-		ADCRead();
-	}
-
-	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3);
-	while(1);
-
-	GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_4, GPIO_PIN_4);
-*/
 	UARTPrint("USPOK");
 
 	while(1)
 	{
-#define ENABLE
-#ifdef ENABLE
 		if (ctrl_do_sample)
 		{
 			ctrl_do_sample = FALSE;
@@ -311,18 +200,7 @@ int main(void)
 				}
 			}
 
-			current_sample_index++;
-			if (current_sample_index == configs.num_samples_frame)
-				current_sample_index = 0;
+			current_sample_index = incrementIndex(current_sample_index);
 		}
-#endif
-
-		//UARTCharPut(UART0_BASE, ADCRead());
-/*
-		// LED3 blinking logic
-		if (LED3 < limLED3/2) GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3);
-		else GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0);
-		if (LED3++ == limLED3) LED3 = 0;
-		*/
 	}
 }
