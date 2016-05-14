@@ -47,6 +47,21 @@ void blinkLED2() {
 		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0); LED2 = TRUE; }
 }
 
+void blinkLED3() {
+	if (LED3)
+		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3); LED3 = FALSE; }
+	else
+		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0); LED3 = TRUE; }
+}
+
+void blinkB2() {
+	static char B2 = 0;
+
+	if (B2)
+			{ GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_2, GPIO_PIN_2); B2 = FALSE; }
+		else
+			{ GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_2, 0); B2 = TRUE; }
+}
 /**
  * INTERRUPT HANDLERS
  */
@@ -79,12 +94,18 @@ void UART1IntHandler(void)
 	}
 }
 
+int i = 0;
 void Timer0AIntHandler(void)
 {
 	// Clear the timer interrupt
 	TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
 
 	ctrl_do_sample = TRUE;
+
+	if (i++ == 1000)
+		blinkLED3();
+	if (i == 2000)
+		i=0;
 }
 
 void Timer1AIntHandler(void)
@@ -106,7 +127,7 @@ void Timer2AIntHandler(void)
 	// Clear the timer interrupt
 	TimerIntClear(TIMER2_BASE, TIMER_TIMA_TIMEOUT);
 
-	blinkLED2();
+	//blinkLED2();
 
 	if (ctrl_current_state == CONTINUOUS)
 		UARTPrint("USPOK");
@@ -119,9 +140,15 @@ int main(void)
 {
 	initializeConfiguration(&configs);
 
-	initializeHardware(&configs);
+	//0.00001 = período de 20us
+	//0.001 = período de 2ms
+	initializeHardware(&configs, 0.01);
 
 	//test();
+
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
+	GPIOPinTypeGPIOOutput(GPIO_PORTB_BASE, GPIO_PIN_2);
+	GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_2, 0);
 
 	UARTPrint("USPOK");
 
@@ -141,6 +168,7 @@ int main(void)
 				if (continuousSamplingHoldOff != 0)
 					continuousSamplingHoldOff--;
 				else {
+					blinkB2();
 					UARTPrintChar(samples_array[current_sample_index]);
 					continuousSamplingHoldOff = getContinuousModeSamplingSpacing(&configs);
 				}
@@ -173,6 +201,7 @@ int main(void)
 				// Time's up, no trigger detected
 				if (hold_off_counter == 0) {
 					ctrl_current_state = CONTINUOUS;
+					continuousSamplingHoldOff = getContinuousModeSamplingSpacing(&configs);
 					break;
 				}
 				else {

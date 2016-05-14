@@ -33,33 +33,37 @@ unsigned int getFrameStart(CONFIG * configs, unsigned int current_index) {
 }
 
 void parseCommand(CONFIG * configs, char command_received) {
-	if ((command_received & MASK_COMMAND) == COMMAND) {
-		switch(command_received & MASK_SUB_COMMAND) {
-		case SET_TRIGGER_LEVEL:
-			if ((command_received & MASK_COMMAND_VALUE) == TRIGGER_LEVEL_OFF)
-				configs->trigger_configuration = DISABLED;
-			else {
 
-				configs->trigger_configuration = RISE; //TODO
-				configs->current_trigger_level = (unsigned char) ((command_received & MASK_COMMAND_VALUE) * 256 / TRIGGER_LEVEL_100);
-			}
-			break;
+	switch(command_received & MASK_COMMAND) {
 
-		case SET_HOLD_OFF:
-			configs->hold_off_value = (unsigned char) (command_received & MASK_COMMAND_VALUE);
-			break;
+	case SET_TRIGGER_RISE:
+		configs->trigger_configuration = RISE;
+		configs->current_trigger_level = (unsigned char) ((command_received & MASK_COMMAND_VALUE) * 256 / TRIGGER_LEVEL_100);
+		break;
 
-		case SET_TIME_SCALE:
-			if (configs->current_time_scale != (unsigned char) (command_received & MASK_COMMAND_VALUE)) {
-				configs->current_time_scale = (command_received & MASK_COMMAND_VALUE);
+	case SET_TRIGGER_FALL:
+		configs->trigger_configuration = FALL;
+		configs->current_trigger_level = (unsigned char) ((command_received & MASK_COMMAND_VALUE) * 256 / TRIGGER_LEVEL_100);
+		break;
 
-				unsigned long newTimePeriod = getTimePeriod(configs);
-				updateNumSamplesFrame(configs);
+	case SET_TRIGGER_OFF:
+		configs->trigger_configuration = DISABLED;
+		break;
 
-				TimerLoadSet(TIMER0_BASE, TIMER_A, newTimePeriod);
-			}
-			break;
+	case SET_HOLD_OFF:
+		configs->hold_off_value = (unsigned char) (command_received & MASK_COMMAND_VALUE);
+		break;
+
+	case SET_TIME_SCALE:
+		if (configs->current_time_scale != (unsigned char) (command_received & MASK_COMMAND_VALUE)) {
+			configs->current_time_scale = (command_received & MASK_COMMAND_VALUE);
+
+			unsigned long newTimePeriod = getTimePeriod(configs);
+			updateNumSamplesFrame(configs);
+
+			TimerLoadSet(TIMER0_BASE, TIMER_A, newTimePeriod);
 		}
+		break;
 	}
 }
 
@@ -119,200 +123,36 @@ void sendSamplesFrame(CONFIG *configs, unsigned char *samples_array, unsigned in
 
 unsigned long getTimePeriod(CONFIG *configs)
 {
-	switch(configs->current_time_scale)
-	{
-	case TIME_SCALE_10US:
-		return 500;
-	case TIME_SCALE_50US:
-		return 500;
-	case TIME_SCALE_100US:
-		return 500;
-	case TIME_SCALE_200US:
-		return 500;
-	case TIME_SCALE_500US:
-		return 500;
-	case TIME_SCALE_1MS:
-		return 500;
-	case TIME_SCALE_5MS:
-		return 500;
-	case TIME_SCALE_10MS:
-		return 500;
-	case TIME_SCALE_50MS:
-		return 2500;
-	case TIME_SCALE_100MS:
-		return 5000;
-	case TIME_SCALE_200MS:
-		return 10000;
-	case TIME_SCALE_500MS:
-		return 25000;
-	case TIME_SCALE_1S:
-		return 50000;
-	}
-
-	return 0;
+	static unsigned int TIME_PERIOD[] = {500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 125000};
+	return TIME_PERIOD[configs->current_time_scale];
 }
 
-void updateNumSamplesFrame(CONFIG *configs) {
-	switch(configs->current_time_scale) {
-	case TIME_SCALE_10US:
-		configs->num_samples_frame = 1;
-		break;
-	case TIME_SCALE_50US:
-		configs->num_samples_frame = 5;
-		break;
-	case TIME_SCALE_100US:
-		configs->num_samples_frame = 10;
-		break;
-	case TIME_SCALE_200US:
-		configs->num_samples_frame = 20;
-		break;
-	case TIME_SCALE_500US:
-		configs->num_samples_frame = 50;
-		break;
-	case TIME_SCALE_1MS:
-		configs->num_samples_frame = 100;
-		break;
-	case TIME_SCALE_5MS:
-		configs->num_samples_frame = 500;
-		break;
-	case TIME_SCALE_10MS:
-		configs->num_samples_frame = 1000;
-		break;
-	case TIME_SCALE_50MS:
-		configs->num_samples_frame = 1000;
-		break;
-	case TIME_SCALE_100MS:
-		configs->num_samples_frame = 1024;
-		break;
-	case TIME_SCALE_200MS:
-		configs->num_samples_frame = 1000;
-		break;
-	case TIME_SCALE_500MS:
-		configs->num_samples_frame = 1000;
-		break;
-	case TIME_SCALE_1S:
-		configs->num_samples_frame = 1000;
-		break;
-	}
+void updateNumSamplesFrame(CONFIG *configs)
+{
+	static unsigned int NUM_SAMPLES_FRAME[] = {1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 2000};
+	configs->num_samples_frame = NUM_SAMPLES_FRAME[configs->current_time_scale];
 }
 
-unsigned int calculateHoldOffSleepTicks(CONFIG *configs) {
-	unsigned int returnVal = 0;
-	switch(configs->current_time_scale)
-	{
-	case TIME_SCALE_10US:
-		returnVal = 12500;
-		break;
-	case TIME_SCALE_50US:
-		returnVal = 12499;
-		break;
-	case TIME_SCALE_100US:
-		returnVal = 12499;
-		break;
-	case TIME_SCALE_200US:
-		returnVal = 12498;
-		break;
-	case TIME_SCALE_500US:
-		returnVal = 12494;
-		break;
-	case TIME_SCALE_1MS:
-		returnVal = 12488;
-		break;
-	case TIME_SCALE_5MS:
-		returnVal = 12438;
-		break;
-	case TIME_SCALE_10MS:
-		returnVal = 12375;
-		break;
-	case TIME_SCALE_50MS:
-		returnVal = 2375;
-		break;
-	case TIME_SCALE_100MS:
-		returnVal = 1125;
-		break;
-	case TIME_SCALE_200MS:
-		returnVal = 500;
-		break;
-	case TIME_SCALE_500MS:
-		returnVal = 125;
-		break;
-	case TIME_SCALE_1S:
-		returnVal = 0;
-		break;
-	}
-
-	return returnVal * configs->hold_off_value;
+unsigned int calculateHoldOffSleepTicks(CONFIG *configs)
+{
+	static unsigned int HOLD_OFF_SLEEP_TICKS[] = {12500, 12500, 12499, 12499, 12498, 12494, 12488, 12475, 12438, 12375, 6125, 2375, 1125, 500, 125, 0, 0, 0};
+	return HOLD_OFF_SLEEP_TICKS[configs->current_time_scale] * configs->hold_off_value;
 }
 
-unsigned int calculateHoldOffTicks(CONFIG *configs) {
-	switch(configs->current_time_scale)
-	{
-	case TIME_SCALE_10US:
-		return 99999;
-	case TIME_SCALE_50US:
-		return 99995;
-	case TIME_SCALE_100US:
-		return 99990;
-	case TIME_SCALE_200US:
-		return 99980;
-	case TIME_SCALE_500US:
-		return 99950;
-	case TIME_SCALE_1MS:
-		return 99900;
-	case TIME_SCALE_5MS:
-		return 39800;
-	case TIME_SCALE_10MS:
-		return 99000;
-	case TIME_SCALE_50MS:
-		return 19000;
-	case TIME_SCALE_100MS:
-		return 9000;
-	case TIME_SCALE_200MS:
-		return 4000;
-	case TIME_SCALE_500MS:
-		return 1000;
-	case TIME_SCALE_1S:
-		return 1000;
-	}
-
-	return 0;
+unsigned int calculateHoldOffTicks(CONFIG *configs)
+{
+	static unsigned int HOLD_OFF_TICKS[] = {99999, 99998, 99995, 99990, 99980, 99950, 99900, 99800, 99500, 99000, 49000, 19000, 9000, 4000, 1000, 1000, 500, 200};
+	return HOLD_OFF_TICKS[configs->current_time_scale];
 }
 
-unsigned int getContinuousModeSamplingSpacing(CONFIG *configs) {
-	switch(configs->current_time_scale)
-	{
-	case TIME_SCALE_10US:
-		return 100;
-	case TIME_SCALE_50US:
-		return 100;
-	case TIME_SCALE_100US:
-		return 100;
-	case TIME_SCALE_200US:
-		return 100;
-	case TIME_SCALE_500US:
-		return 100;
-	case TIME_SCALE_1MS:
-		return 100;
-	case TIME_SCALE_5MS:
-		return 100;
-	case TIME_SCALE_10MS:
-		return 100;
-	case TIME_SCALE_50MS:
-		return 20;
-	case TIME_SCALE_100MS:
-		return 10;
-	case TIME_SCALE_200MS:
-		return 5;
-	case TIME_SCALE_500MS:
-		return 2;
-	case TIME_SCALE_1S:
-		return 1;
-
-	}
-	return 1000;
+unsigned int getContinuousModeSamplingSpacing(CONFIG *configs)
+{
+	static unsigned int CONT_SAMPLING_SPACING[] = {9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 4, 1, 1, 1, 1, 1, 1, 1};
+	return CONT_SAMPLING_SPACING[configs->current_time_scale];
+	return 1;
 }
 
-void initializeHardware(CONFIG *configs) {
+void initializeHardware(CONFIG *configs, float halfPeriodOut) {
 	// clock
 	SysCtlClockSet(SYSCTL_SYSDIV_4|SYSCTL_USE_PLL|SYSCTL_XTAL_16MHZ|SYSCTL_OSC_MAIN);
 
@@ -371,8 +211,7 @@ void initializeHardware(CONFIG *configs) {
 	// Timer 1
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
 	TimerConfigure(TIMER1_BASE, TIMER_CFG_32_BIT_PER);
-	TimerLoadSet(TIMER1_BASE, TIMER_A, (SysCtlClockGet() * 0.0011)); //0.00001 = período de 20us
-																	  //0.001 = período de 2ms
+	TimerLoadSet(TIMER1_BASE, TIMER_A, (SysCtlClockGet() * halfPeriodOut));
 	IntEnable(INT_TIMER1A);
 	TimerEnable(TIMER1_BASE, TIMER_A);
 
