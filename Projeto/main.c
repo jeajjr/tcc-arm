@@ -31,6 +31,7 @@ int limLED2 = 5;
 int LED3 = 0;
 int limLED3 = 50;
 int PWM = 0;
+BOOL sending_frame = FALSE;
 
 typedef enum {
 	CONTINUOUS,
@@ -62,6 +63,16 @@ void blinkB2() {
 		else
 			{ GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_2, 0); B2 = TRUE; }
 }
+
+void blinkB7() {
+	static char B7 = 0;
+
+	if (B7)
+			{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_0, GPIO_PIN_0); B7 = FALSE; }
+		else
+			{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_0, 0); B7 = TRUE; }
+}
+
 /**
  * INTERRUPT HANDLERS
  */
@@ -100,12 +111,16 @@ void Timer0AIntHandler(void)
 	// Clear the timer interrupt
 	TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
 
-	ctrl_do_sample = TRUE;
-
+	if (ctrl_do_sample && !sending_frame)
+		blinkB2();
+	//else
+		ctrl_do_sample = TRUE;
+/*
 	if (i++ == 1000)
 		blinkLED3();
 	if (i == 2000)
 		i=0;
+		*/
 }
 
 void Timer1AIntHandler(void)
@@ -147,16 +162,27 @@ int main(void)
 	//test();
 
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
-	GPIOPinTypeGPIOOutput(GPIO_PORTB_BASE, GPIO_PIN_2);
-	GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_2, 0);
+	GPIOPinTypeGPIOOutput(GPIO_PORTB_BASE, GPIO_PIN_2 | GPIO_PIN_7);
+	GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_2 | GPIO_PIN_7, 0);
 
 	UARTPrint("USPOK");
+	int i;
+
+	while(0) {
+		GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_2, GPIO_PIN_2);
+		for (i=0;i<100;i++)
+			ADCRead();
+		GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_2, 0);
+		for (i=0;i<100000;i++);
+	}
 
 	while(1)
 	{
 		if (ctrl_do_sample)
 		{
+
 			ctrl_do_sample = FALSE;
+
 
 			// continuous circular acquisition
 			samples_array[current_sample_index] = ADCRead();
@@ -168,7 +194,6 @@ int main(void)
 				if (continuousSamplingHoldOff != 0)
 					continuousSamplingHoldOff--;
 				else {
-					blinkB2();
 					UARTPrintChar(samples_array[current_sample_index]);
 					continuousSamplingHoldOff = getContinuousModeSamplingSpacing(&configs);
 				}
@@ -177,15 +202,20 @@ int main(void)
 			case TRIGGERED:
 				// detect end of current frame
 				if (
+						/*
 					((current_frame_start_index == 0 && current_sample_index == configs.num_samples_frame - 1)
 					|| (current_sample_index == current_frame_start_index - 1))
+					*/
+					current_sample_index == incrementIndexBy(current_frame_start_index, configs.num_samples_frame - 1)
 					)
 				{
 					ctrl_current_state = HOLD_OFF_SLEEP;
 					hold_off_counter = calculateHoldOffTicks(&configs);
 					limit = calculateHoldOffSleepTicks(&configs);
-					GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0);
+
+					sending_frame = TRUE;
 					sendSamplesFrame(&configs, samples_array, current_frame_start_index);
+					sending_frame = FALSE;
 
 				}
 				break;

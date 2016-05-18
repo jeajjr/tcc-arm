@@ -17,6 +17,13 @@ unsigned int incrementIndex(unsigned int index) {
 	return index;
 }
 
+unsigned int incrementIndexBy(unsigned int index, unsigned int addend) {
+	index += addend;
+	if (index >= BUFFER_SIZE)
+		return index - BUFFER_SIZE;
+	return index;
+}
+
 unsigned int decrementIndex(unsigned int value, unsigned int limit) {
 	if (value != 0)
 		return value - 1;
@@ -67,17 +74,6 @@ void parseCommand(CONFIG * configs, char command_received) {
 	}
 }
 
-unsigned char ADCRead() {
-	unsigned long ulADC0Value[4];
-	ADCIntClear(ADC0_BASE, 1);
-	ADCProcessorTrigger(ADC0_BASE, 1);
-	while(!ADCIntStatus(ADC0_BASE, 1, false));
-	ADCSequenceDataGet(ADC0_BASE, 1, ulADC0Value);
-	unsigned int leitura = (ulADC0Value[0] + ulADC0Value[1] + ulADC0Value[2] + ulADC0Value[3])/4;
-	return ((leitura>>4) & 0xFF);
-}
-
-
 void UARTPrintChar(char a) {
 	UARTCharPutNonBlocking(UART1_BASE, a);
 	UARTCharPut(UART0_BASE, a);
@@ -99,7 +95,7 @@ void UARTPrintln(char *string) {
 void sendSamplesFrame(CONFIG *configs, unsigned char *samples_array, unsigned int current_frame_start_index)
 {
 	unsigned int i;
-	//U S P [DATA | CHANNEL] [VOLTAGE_SCALE] [TIME_SCALE] [DATA_LENGTH_H] [DATA_LENGTH_L] [DATA...] O K
+	//U S P B K [DATA | CHANNEL] [VOLTAGE_SCALE] [TIME_SCALE] [DATA_LENGTH_H] [DATA_LENGTH_L] [DATA...] 40 80 200
 
 	UARTPrintChar('U');
 	UARTPrintChar('S');
@@ -117,31 +113,39 @@ void sendSamplesFrame(CONFIG *configs, unsigned char *samples_array, unsigned in
 		current_frame_start_index = incrementIndex(current_frame_start_index);
 	}
 
+	UARTPrintChar(40);
+	UARTPrintChar(80);
+	UARTPrintChar(200);
+		/*
 	UARTPrintChar('O');
 	UARTPrintChar('K');
+	*/
 }
+
+
+static unsigned int NUM_SAMPLES_FRAME[] = {1, 2, 5, 10, 30, 60, 120, 256, 512, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024};
+static unsigned int TIME_PERIOD[] = {500, 625, 500, 500, 417, 417, 417, 488, 488, 488, 1221, 2441, 4883, 12207, 24414, 48828, 122070};
+static unsigned int HOLD_OFF_SLEEP_TICKS[] = {12500, 10000, 12499, 12499, 14996, 14993, 14985, 12768, 12736, 12672, 4992, 2432, 1152, 384, 128, 125, 0};
+static unsigned int HOLD_OFF_TICKS[] = {99999, 79998, 99995, 99990, 119970, 119940, 119880, 102144, 101888, 101376, 39936, 19456, 9216, 3072, 1024, 1000, 500};
+
 
 unsigned long getTimePeriod(CONFIG *configs)
 {
-	static unsigned int TIME_PERIOD[] = {500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 125000};
 	return TIME_PERIOD[configs->current_time_scale];
 }
 
 void updateNumSamplesFrame(CONFIG *configs)
 {
-	static unsigned int NUM_SAMPLES_FRAME[] = {1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 2000};
 	configs->num_samples_frame = NUM_SAMPLES_FRAME[configs->current_time_scale];
 }
 
 unsigned int calculateHoldOffSleepTicks(CONFIG *configs)
 {
-	static unsigned int HOLD_OFF_SLEEP_TICKS[] = {12500, 12500, 12499, 12499, 12498, 12494, 12488, 12475, 12438, 12375, 6125, 2375, 1125, 500, 125, 0, 0, 0};
 	return HOLD_OFF_SLEEP_TICKS[configs->current_time_scale] * configs->hold_off_value;
 }
 
 unsigned int calculateHoldOffTicks(CONFIG *configs)
 {
-	static unsigned int HOLD_OFF_TICKS[] = {99999, 99998, 99995, 99990, 99980, 99950, 99900, 99800, 99500, 99000, 49000, 19000, 9000, 4000, 1000, 1000, 500, 200};
 	return HOLD_OFF_TICKS[configs->current_time_scale];
 }
 
@@ -149,7 +153,20 @@ unsigned int getContinuousModeSamplingSpacing(CONFIG *configs)
 {
 	static unsigned int CONT_SAMPLING_SPACING[] = {9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 4, 1, 1, 1, 1, 1, 1, 1};
 	return CONT_SAMPLING_SPACING[configs->current_time_scale];
-	return 1;
+}
+
+unsigned char ADCRead() {
+	unsigned long ulADC0Value[4];
+	unsigned long sequencer = 3;
+	ADCIntClear(ADC0_BASE, sequencer);
+	ADCProcessorTrigger(ADC0_BASE, sequencer);
+	while(!ADCIntStatus(ADC0_BASE, sequencer, false));
+	ADCSequenceDataGet(ADC0_BASE, sequencer, ulADC0Value);
+	/*
+	unsigned int leitura = (ulADC0Value[0] + ulADC0Value[1] + ulADC0Value[2] + ulADC0Value[3])/4;
+	return ((leitura>>4) & 0xFF);
+	*/
+	return ((ulADC0Value[0]>>4) & 0xFF);
 }
 
 void initializeHardware(CONFIG *configs, float halfPeriodOut) {
@@ -181,25 +198,23 @@ void initializeHardware(CONFIG *configs, float halfPeriodOut) {
 
 	// ADC
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
-	SysCtlADCSpeedSet(SYSCTL_ADCSPEED_1MSPS);//SYSCTL_ADCSPEED_500KSPS
+	SysCtlADCSpeedSet(SYSCTL_ADCSPEED_1MSPS);
 
 	// ADC - sequencer 1
-	ADCSequenceDisable(ADC0_BASE, 1);
-	ADCSequenceConfigure(ADC0_BASE, 1, ADC_TRIGGER_PROCESSOR, 0);
-	ADCSequenceStepConfigure(ADC0_BASE, 1, 0, ADC_CTL_CH0);
-	ADCSequenceStepConfigure(ADC0_BASE, 1, 1, ADC_CTL_CH0);
-	ADCSequenceStepConfigure(ADC0_BASE, 1, 2, ADC_CTL_CH0);
-	ADCSequenceStepConfigure(ADC0_BASE, 1, 3, ADC_CTL_CH0 | ADC_CTL_IE | ADC_CTL_END);
-	ADCSequenceEnable(ADC0_BASE, 1);
+//	ADCSequenceDisable(ADC0_BASE, 1);
+//	ADCSequenceConfigure(ADC0_BASE, 1, ADC_TRIGGER_PROCESSOR, 0);
+//	ADCSequenceStepConfigure(ADC0_BASE, 1, 0, /*ADC_CTL_CH0);
+//	ADCSequenceStepConfigure(ADC0_BASE, 1, 1, ADC_CTL_CH0);
+//	ADCSequenceStepConfigure(ADC0_BASE, 1, 2, ADC_CTL_CH0);
+//	ADCSequenceStepConfigure(ADC0_BASE, 1, 3,*/ ADC_CTL_CH0 | ADC_CTL_IE | ADC_CTL_END);
+//	ADCSequenceEnable(ADC0_BASE, 1);
 
 
 	// ADC - sequencer 3
-/*
 	ADCSequenceDisable(ADC0_BASE, 3);
 	ADCSequenceConfigure(ADC0_BASE, 3, ADC_TRIGGER_PROCESSOR, 0);
 	ADCSequenceStepConfigure(ADC0_BASE, 3, 0, ADC_CTL_CH0 | ADC_CTL_IE | ADC_CTL_END);
 	ADCSequenceEnable(ADC0_BASE, 3);
-*/
 
 	// Timer 0
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);

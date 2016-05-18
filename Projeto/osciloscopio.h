@@ -133,6 +133,7 @@ void initializeConfiguration (CONFIG *configs);
 
 unsigned int incrementIndex(unsigned int index);
 unsigned int decrementIndex(unsigned int value, unsigned int limit);
+unsigned int incrementIndexBy(unsigned int index, unsigned int addend);
 
 unsigned int getFrameStart(CONFIG * configs, unsigned int current_index);
 void parseCommand(CONFIG * configs, char command_received);
