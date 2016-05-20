@@ -122,12 +122,11 @@ void sendSamplesFrame(CONFIG *configs, unsigned char *samples_array, unsigned in
 	*/
 }
 
-
 static unsigned int NUM_SAMPLES_FRAME[] = {1, 2, 5, 10, 30, 60, 120, 256, 512, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024};
 static unsigned int TIME_PERIOD[] = {500, 625, 500, 500, 417, 417, 417, 488, 488, 488, 1221, 2441, 4883, 12207, 24414, 48828, 122070};
 static unsigned int HOLD_OFF_SLEEP_TICKS[] = {12500, 10000, 12499, 12499, 14996, 14993, 14985, 12768, 12736, 12672, 4992, 2432, 1152, 384, 128, 125, 0};
 static unsigned int HOLD_OFF_TICKS[] = {99999, 79998, 99995, 99990, 119970, 119940, 119880, 102144, 101888, 101376, 39936, 19456, 9216, 3072, 1024, 1000, 500};
-
+static unsigned int CONT_SAMPLING_SPACING[] = {9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 4, 1, 1, 1, 1, 1, 1};
 
 unsigned long getTimePeriod(CONFIG *configs)
 {
@@ -151,7 +150,6 @@ unsigned int calculateHoldOffTicks(CONFIG *configs)
 
 unsigned int getContinuousModeSamplingSpacing(CONFIG *configs)
 {
-	static unsigned int CONT_SAMPLING_SPACING[] = {9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 4, 1, 1, 1, 1, 1, 1, 1};
 	return CONT_SAMPLING_SPACING[configs->current_time_scale];
 }
 
