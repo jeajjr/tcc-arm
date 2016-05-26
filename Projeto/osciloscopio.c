@@ -31,12 +31,22 @@ unsigned int decrementIndex(unsigned int value, unsigned int limit) {
 	return limit - 1;
 }
 
+unsigned int decrementIndexBy(int index, unsigned int subtrahend, int limit) {
+	index -= subtrahend;
+	if (index < 0)
+		return limit + index;
+	return index;
+}
+
 unsigned int getFrameStart(CONFIG * configs, unsigned int current_index) {
+	return decrementIndexBy(current_index, configs->trigger_sample_offset, BUFFER_SIZE);
+	/*
 	int a = current_index - configs->trigger_sample_offset;
 	if (a < 0)
 		return BUFFER_SIZE + current_index - configs->trigger_sample_offset;
 	else
 		return current_index - configs->trigger_sample_offset;
+		*/
 }
 
 void parseCommand(CONFIG * configs, char command_received) {
@@ -122,11 +132,26 @@ void sendSamplesFrame(CONFIG *configs, unsigned char *samples_array, unsigned in
 	*/
 }
 
-static unsigned int NUM_SAMPLES_FRAME[] = {1, 2, 5, 10, 30, 60, 120, 256, 512, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024};
-static unsigned int TIME_PERIOD[] = {500, 625, 500, 500, 417, 417, 417, 488, 488, 488, 1221, 2441, 4883, 12207, 24414, 48828, 122070};
-static unsigned int HOLD_OFF_SLEEP_TICKS[] = {12500, 10000, 12499, 12499, 14996, 14993, 14985, 12768, 12736, 12672, 4992, 2432, 1152, 384, 128, 125, 0};
-static unsigned int HOLD_OFF_TICKS[] = {99999, 79998, 99995, 99990, 119970, 119940, 119880, 102144, 101888, 101376, 39936, 19456, 9216, 3072, 1024, 1000, 500};
-static unsigned int CONT_SAMPLING_SPACING[] = {9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 4, 1, 1, 1, 1, 1, 1};
+static unsigned int NUM_SAMPLES_FRAME[] = {1, 2, 5, 16, 32, 75, 155, 390, 780, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024};
+static unsigned int TIME_PERIOD[] = {500, 625, 500, 312, 391, 333, 323, 321, 321, 488, 1221, 2441, 4883, 12207, 24414, 48828, 122070};
+static unsigned int HOLD_OFF_TICKS[] = {99999, 79998, 99995, 159984, 127968, 149925, 154845, 155610, 155220, 101376, 39936, 19456, 9216, 3072, 1024, 1000, 500};
+static unsigned int CONT_SAMPLING_SPACING[] = {9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 4, 1, 1, 1, 1, 1, 500};
+unsigned int HOLD_OFF_SLEEP_TICKS[15][8] = {{12499, 12499, 12500, 12500, 12500, 12500, 12501, 12500},
+{9998, 9999, 9999, 10000, 10000, 10001, 10001, 10000},
+{12496, 12497, 12498, 12499, 12501, 12502, 12503, 12501},
+{19986, 19990, 19994, 19998, 20002, 20006, 20010, 20002},
+{15972, 15980, 15988, 15996, 16004, 16012, 16020, 16004},
+{18684, 18703, 18722, 18741, 18759, 18778, 18797, 18759},
+{19239, 19278, 19317, 19356, 19394, 19433, 19472, 19394},
+{19159, 19256, 19354, 19451, 19549, 19646, 19744, 19549},
+{18818, 19013, 19208, 19403, 19598, 19793, 19988, 19598},
+{11904, 12160, 12416, 12672, 12928, 13184, 13440, 12928},
+{4224, 4480, 4736, 4992, 5248, 5504, 5760, 5248},
+{1664, 1920, 2176, 2432, 2688, 2944, 3200, 2688},
+{384, 640, 896, 1152, 1408, 1664, 1920, 1408},
+{0, 0, 128, 384, 640, 896, 1152, 640},
+{0, 0, 0, 128, 384, 640, 896, 384}
+};
 
 unsigned long getTimePeriod(CONFIG *configs)
 {
@@ -135,12 +160,13 @@ unsigned long getTimePeriod(CONFIG *configs)
 
 void updateNumSamplesFrame(CONFIG *configs)
 {
-	configs->num_samples_frame = NUM_SAMPLES_FRAME[configs->current_time_scale];
+	configs->num_samples_frame = NUM_SAMPLES_FRAME[configs->current_time_scale] * 2;
+	configs->trigger_sample_offset = configs->num_samples_frame / 2;
 }
 
 unsigned int calculateHoldOffSleepTicks(CONFIG *configs)
 {
-	return HOLD_OFF_SLEEP_TICKS[configs->current_time_scale] * configs->hold_off_value;
+	return HOLD_OFF_SLEEP_TICKS[configs->current_time_scale][configs->hold_off_value];
 }
 
 unsigned int calculateHoldOffTicks(CONFIG *configs)
@@ -152,17 +178,53 @@ unsigned int getContinuousModeSamplingSpacing(CONFIG *configs)
 {
 	return CONT_SAMPLING_SPACING[configs->current_time_scale];
 }
+void blinkB2()
+{
+	static char B2 = 0;
 
-unsigned char ADCRead() {
+	if (B2)
+			{ GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_2, GPIO_PIN_2); B2 = FALSE; }
+		else
+			{ GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_2, 0); B2 = TRUE; }
+}
+
+unsigned char ADCRead()
+{
+	static int adc = 0;
+
 	unsigned long ulADC0Value[4];
 	unsigned long sequencer = 3;
+/*
+	if (!ADCIntStatus(ADC0_BASE, sequencer, false))
+		blinkB2();
+
+	ADCSequenceDataGet(ADC0_BASE, sequencer, ulADC0Value);
+*/
+	if (adc) {
+		adc = 0;
+		sequencer = 3;
+
+		ADCSequenceDataGet(ADC0_BASE, sequencer, ulADC0Value);
+
+		ADCIntClear(ADC0_BASE, sequencer);
+		ADCProcessorTrigger(ADC0_BASE, sequencer);
+
+	}
+	else {
+		adc = 1;
+		sequencer = 1;
+
+		ADCSequenceDataGet(ADC1_BASE, sequencer, ulADC0Value);
+
+		ADCIntClear(ADC1_BASE, sequencer);
+		ADCProcessorTrigger(ADC1_BASE, sequencer);
+
+	}
+	/*
 	ADCIntClear(ADC0_BASE, sequencer);
 	ADCProcessorTrigger(ADC0_BASE, sequencer);
 	while(!ADCIntStatus(ADC0_BASE, sequencer, false));
 	ADCSequenceDataGet(ADC0_BASE, sequencer, ulADC0Value);
-	/*
-	unsigned int leitura = (ulADC0Value[0] + ulADC0Value[1] + ulADC0Value[2] + ulADC0Value[3])/4;
-	return ((leitura>>4) & 0xFF);
 	*/
 	return ((ulADC0Value[0]>>4) & 0xFF);
 }
@@ -198,6 +260,8 @@ void initializeHardware(CONFIG *configs, float halfPeriodOut) {
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
 	SysCtlADCSpeedSet(SYSCTL_ADCSPEED_1MSPS);
 
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC1);
+
 	// ADC - sequencer 1
 //	ADCSequenceDisable(ADC0_BASE, 1);
 //	ADCSequenceConfigure(ADC0_BASE, 1, ADC_TRIGGER_PROCESSOR, 0);
@@ -208,11 +272,17 @@ void initializeHardware(CONFIG *configs, float halfPeriodOut) {
 //	ADCSequenceEnable(ADC0_BASE, 1);
 
 
-	// ADC - sequencer 3
+	// ADC - sequencer 3 for ADC 0
 	ADCSequenceDisable(ADC0_BASE, 3);
 	ADCSequenceConfigure(ADC0_BASE, 3, ADC_TRIGGER_PROCESSOR, 0);
 	ADCSequenceStepConfigure(ADC0_BASE, 3, 0, ADC_CTL_CH0 | ADC_CTL_IE | ADC_CTL_END);
 	ADCSequenceEnable(ADC0_BASE, 3);
+
+	// ADC - sequencer 1 for ADC 1
+	ADCSequenceDisable(ADC1_BASE, 1);
+	ADCSequenceConfigure(ADC1_BASE, 1, ADC_TRIGGER_PROCESSOR, 0);
+	ADCSequenceStepConfigure(ADC1_BASE, 1, 0, ADC_CTL_CH0 | ADC_CTL_IE | ADC_CTL_END);
+	ADCSequenceEnable(ADC1_BASE, 1);
 
 	// Timer 0
 	SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);

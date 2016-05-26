@@ -17,13 +17,12 @@ BOOL ctrl_do_sample = FALSE;
 BOOL ctrl_trigger_detected = FALSE;
 BOOL crtl_hold_off = FALSE;
 
-unsigned int limit;
-
 char command_received = 0;
 unsigned char samples_array[BUFFER_SIZE] = {0};
 unsigned int current_sample_index = 0;
 unsigned int current_frame_start_index = 0;
 unsigned int continuousSamplingHoldOff = 1;
+unsigned int hold_off_sleep_limit = 0;
 unsigned int hold_off_counter = 0;
 
 int LED2 = 0;
@@ -55,14 +54,7 @@ void blinkLED3() {
 		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0); LED3 = TRUE; }
 }
 
-void blinkB2() {
-	static char B2 = 0;
 
-	if (B2)
-			{ GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_2, GPIO_PIN_2); B2 = FALSE; }
-		else
-			{ GPIOPinWrite(GPIO_PORTB_BASE, GPIO_PIN_2, 0); B2 = TRUE; }
-}
 
 void blinkB7() {
 	static char B7 = 0;
@@ -125,15 +117,16 @@ void Timer0AIntHandler(void)
 
 void Timer1AIntHandler(void)
 {
+	static int a = 0;
 	// Clear the timer interrupt
 	TimerIntClear(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
 	PWM++;
-	if (PWM%2)//PWM == 4 || PWM == 6 || PWM == 11 || PWM == 20)
+	if (PWM == 4 || PWM == 6 || PWM == 11 || PWM == 20 || (PWM == 21 && (a++ % 2)))
 		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_4, GPIO_PIN_4);  }
 	else
 		{ GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_4, 0);  }
 
-	if (PWM == 50)
+	if (PWM == 70)
 		PWM = 0;
 }
 
@@ -180,9 +173,7 @@ int main(void)
 	{
 		if (ctrl_do_sample)
 		{
-
 			ctrl_do_sample = FALSE;
-
 
 			// continuous circular acquisition
 			samples_array[current_sample_index] = ADCRead();
@@ -201,27 +192,21 @@ int main(void)
 
 			case TRIGGERED:
 				// detect end of current frame
-				if (
-						/*
-					((current_frame_start_index == 0 && current_sample_index == configs.num_samples_frame - 1)
-					|| (current_sample_index == current_frame_start_index - 1))
-					*/
-					current_sample_index == incrementIndexBy(current_frame_start_index, configs.num_samples_frame - 1)
-					)
+				if (current_sample_index == incrementIndexBy(current_frame_start_index, configs.num_samples_frame - 1))
 				{
-					ctrl_current_state = HOLD_OFF_SLEEP;
-					hold_off_counter = calculateHoldOffTicks(&configs);
-					limit = calculateHoldOffSleepTicks(&configs);
-
 					sending_frame = TRUE;
 					sendSamplesFrame(&configs, samples_array, current_frame_start_index);
 					sending_frame = FALSE;
 
+					hold_off_counter = calculateHoldOffTicks(&configs);
+					hold_off_sleep_limit = calculateHoldOffSleepTicks(&configs);
+
+					ctrl_current_state = HOLD_OFF_SLEEP;
 				}
 				break;
 
 			case HOLD_OFF_SLEEP:
-				if (hold_off_counter < limit || hold_off_counter == 0)
+				if (hold_off_counter < hold_off_sleep_limit || hold_off_counter == 0)
 					ctrl_current_state = HOLD_OFF_DETECT;
 				else
 					hold_off_counter--;
@@ -232,7 +217,6 @@ int main(void)
 				if (hold_off_counter == 0) {
 					ctrl_current_state = CONTINUOUS;
 					continuousSamplingHoldOff = getContinuousModeSamplingSpacing(&configs);
-					break;
 				}
 				else {
 					hold_off_counter--;
