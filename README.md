@@ -19,3 +19,9 @@ M4F RX pin, as their operating voltage were 5V and 3V, respectively.
 A special application layer protocol was developed so the microcontroller would
 work in two communication states, one for a constinuous read-and-send of the 
 signal and another for time snapshots when using voltage level triggering.
+
+## Future work
+
+- Design circuitry to expand the input signal voltage range (currently 0V to 3V)
+- Implement mathematical functions on the waveform
+- PCB and casing design
